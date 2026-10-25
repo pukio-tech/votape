@@ -1,3 +1,4 @@
+import { LogOut } from "lucide-react";
 import { redirect } from "next/navigation";
 import { Cedula } from "@/components/Cedula";
 import { Encabezado } from "@/components/Encabezado";
@@ -38,8 +39,8 @@ export default async function Votar() {
         subtitulo={proceso.institucion}
         accion={
           <form action={salir}>
-            <button className="rounded-lg px-3 py-1.5 text-sm font-medium text-marca-100 ring-1 ring-white/25 hover:bg-white/10">
-              Salir
+            <button className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-marca-100 ring-1 ring-white/15 transition hover:bg-white/10 hover:text-white">
+              <LogOut className="size-4" aria-hidden /> <span className="hidden sm:inline">Salir</span>
             </button>
           </form>
         }

@@ -1,0 +1,269 @@
+"use client";
+
+import { ChevronLeft, ChevronRight, Crown, Landmark, WifiOff } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { formatearActualizado } from "@/lib/fechas";
+import type { Resultados } from "@/lib/resultados";
+
+const ALTO_GRAFICO = 300; // px del área de barras
+const ANCHO_COLUMNA = 128; // px por candidato al desplazar con las flechas
+
+const num = (n: number) => n.toLocaleString("es-PE");
+const pct = (n: number) => `${n.toFixed(3)} %`;
+
+/** Escala "redonda" para el eje Y: 0 … tope en ~5 pasos. */
+function escala(max: number) {
+  if (max <= 0) return { tope: 5, paso: 1 };
+  const bruto = max / 5;
+  const magnitud = 10 ** Math.floor(Math.log10(bruto));
+  const n = bruto / magnitud;
+  const paso = Math.max(1, Math.ceil((n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * magnitud));
+  return { tope: Math.ceil(max / paso) * paso, paso };
+}
+
+export function TableroResultados({ inicial, intervaloMs = 10_000 }: { inicial: Resultados; intervaloMs?: number }) {
+  const [datos, setDatos] = useState(inicial);
+  const [conectado, setConectado] = useState(true);
+  const [cargoId, setCargoId] = useState(inicial.cargos[0]?.id ?? "");
+
+  const actualizar = useCallback(async () => {
+    try {
+      const res = await fetch("/api/resultados", { cache: "no-store" });
+      if (!res.ok) throw new Error();
+      setDatos(await res.json());
+      setConectado(true);
+    } catch {
+      setConectado(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(actualizar, intervaloMs);
+    return () => clearInterval(id);
+  }, [actualizar, intervaloMs]);
+
+  const cargo = datos.cargos.find((c) => c.id === cargoId) ?? datos.cargos[0];
+  const { participacion: p } = datos;
+
+  return (
+    <div className="space-y-6">
+      {/* Resumen de participación */}
+      <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80 sm:p-6" aria-label="Participación">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-8">
+          <div>
+            <p className="text-sm font-medium text-marca-600">Participación del padrón</p>
+            <p className="text-4xl font-bold tabular-nums tracking-tight text-marca-900 sm:text-5xl">{pct(p.porcentaje)}</p>
+          </div>
+          <div className="sm:pb-1">
+            <p className="text-lg font-bold text-marca-950">Total de votos emitidos: {num(p.votaron)}</p>
+            <p className="text-sm text-marca-600">
+              de {num(p.padron)} electores habilitados · faltan {num(p.faltan)}
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 h-3 overflow-hidden rounded-full bg-marca-100" role="progressbar" aria-valuenow={p.porcentaje} aria-valuemin={0} aria-valuemax={100}>
+          <div className="h-full rounded-full bg-marca-800 transition-[width] duration-700 ease-out" style={{ width: `${p.porcentaje}%` }} />
+        </div>
+        <div className="mt-3 flex flex-col gap-2 text-xs sm:flex-row sm:items-center sm:justify-between">
+          <p className={`flex items-center gap-2 font-semibold uppercase tracking-wide ${conectado ? "text-slate-600" : "text-red-600"}`}>
+            {conectado ? (
+              <span className="relative flex size-2">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+              </span>
+            ) : (
+              <WifiOff className="size-3.5" aria-hidden />
+            )}
+            {conectado ? `Actualizado al ${formatearActualizado(datos.actualizado)}` : "Sin conexión, reintentando"}
+          </p>
+          <div className="flex items-center gap-4 text-sm text-marca-800">
+            <span className="flex items-center gap-1.5">
+              <span className="size-3 rounded-full bg-marca-800" aria-hidden /> Votaron ({num(p.votaron)})
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-3 rounded-full bg-marca-100 ring-1 ring-marca-200" aria-hidden /> Faltan ({num(p.faltan)})
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* Filtro por cargo */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-marca-900">
+          <Landmark className="size-5 text-marca-600" aria-hidden /> Cargo
+        </span>
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0" role="tablist" aria-label="Filtrar por cargo">
+          {datos.cargos.map((c) => {
+            const activo = c.id === cargo?.id;
+            return (
+              <button
+                key={c.id}
+                role="tab"
+                aria-selected={activo}
+                onClick={() => setCargoId(c.id)}
+                className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
+                  activo ? "bg-marca-800 text-white shadow-sm" : "bg-white text-marca-700 ring-1 ring-inset ring-slate-300 hover:ring-marca-300"
+                }`}
+              >
+                {c.nombre}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {cargo && <GraficoCargo key={cargo.id} cargo={cargo} />}
+    </div>
+  );
+}
+
+type Cargo = Resultados["cargos"][number];
+
+function GraficoCargo({ cargo }: { cargo: Cargo }) {
+  const desplazable = useRef<HTMLDivElement>(null);
+  const { tope, paso } = escala(Math.max(...cargo.candidatos.map((c) => c.votos), 0));
+  const marcas = Array.from({ length: tope / paso + 1 }, (_, i) => i * paso);
+  const lider = cargo.candidatos[0];
+  const hayLider = lider && lider.votos > 0 && cargo.candidatos[1]?.votos !== lider.votos;
+
+  const mover = (dir: 1 | -1) => desplazable.current?.scrollBy({ left: dir * ANCHO_COLUMNA * 2, behavior: "smooth" });
+
+  return (
+    <section className="animate-aparecer rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200/80 sm:p-6" aria-labelledby="titulo-grafico">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 id="titulo-grafico" className="text-lg font-bold text-marca-950">
+          {cargo.nombre}
+        </h3>
+        <p className="text-sm text-slate-500">
+          {num(cargo.total)} {cargo.total === 1 ? "voto válido" : "votos válidos"}
+        </p>
+      </div>
+
+      <div className="relative mt-2 flex">
+        {/* Eje Y */}
+        <div className="relative w-9 shrink-0 sm:w-16" style={{ height: ALTO_GRAFICO, marginTop: 112 }} aria-hidden>
+          {marcas.map((m) => (
+            <span
+              key={m}
+              className="absolute right-1.5 translate-y-1/2 text-[11px] tabular-nums text-slate-500 sm:text-xs"
+              style={{ bottom: `${(m / tope) * 100}%` }}
+            >
+              {num(m)}
+            </span>
+          ))}
+        </div>
+
+        <div ref={desplazable} className="min-w-0 flex-1 overflow-x-auto scroll-smooth [--col:84px] sm:[--col:128px]">
+          <div style={{ minWidth: `calc(${cargo.candidatos.length} * var(--col))` }}>
+            {/* Área de barras (con espacio arriba para foto y porcentaje) */}
+            <div className="pt-28">
+              <div className="relative border-l border-slate-200" style={{ height: ALTO_GRAFICO }}>
+                {marcas.map((m) => (
+                  <span
+                    key={m}
+                    className={`absolute inset-x-0 border-t ${m === 0 ? "border-slate-300" : "border-dashed border-slate-200"}`}
+                    style={{ bottom: `${(m / tope) * 100}%` }}
+                    aria-hidden
+                  />
+                ))}
+                <ul className="relative flex h-full items-end">
+                  {cargo.candidatos.map((c, i) => {
+                    const destacado = hayLider && i === 0;
+                    return (
+                      <li key={c.id} className="flex h-full flex-1 flex-col items-center justify-end px-1.5 sm:px-4" title={`${c.nombreCompleto}: ${num(c.votos)} votos`}>
+                        <div className="mb-2 flex flex-col items-center">
+                          <Foto url={c.fotoUrl} nombre={c.nombreCompleto} destacado={destacado} />
+                          <span className={`mt-1.5 flex items-center gap-1 whitespace-nowrap text-[13px] font-bold tabular-nums sm:text-lg text-marca-700`}>
+                            {destacado && <Crown className="size-3.5 sm:size-4" aria-label="Lidera" />}
+                            {pct(c.porcentaje)}
+                          </span>
+                        </div>
+                        <div
+                          className={`w-full max-w-36 shrink-0 rounded-t-xl transition-[height] duration-700 ease-out ${destacado ? "bg-marca-500" : "bg-acento-400"}`}
+                          style={{ height: `${(c.votos / tope) * 100}%`, minHeight: c.votos > 0 ? 6 : 2 }}
+                        />
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
+
+            {/* Nombres */}
+            <ul className="flex border-l border-transparent pt-3">
+              {cargo.candidatos.map((c) => (
+                <li key={c.id} className="flex-1 px-1 text-center sm:px-4">
+                  <p className="text-[11px] font-semibold uppercase leading-snug text-marca-800 sm:text-[13px]">{c.nombreCompleto}</p>
+                  <p className="mt-0.5 text-xs tabular-nums text-slate-500">{num(c.votos)} votos</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        {cargo.candidatos.length > 3 && (
+          <>
+            <button
+              type="button"
+              onClick={() => mover(-1)}
+              aria-label="Ver candidatos anteriores"
+              className="absolute left-9 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-white text-marca-700 shadow-md ring-1 ring-slate-200 sm:left-16"
+            >
+              <ChevronLeft className="size-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => mover(1)}
+              aria-label="Ver más candidatos"
+              className="absolute right-0 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full bg-white text-marca-700 shadow-md ring-1 ring-slate-200"
+            >
+              <ChevronRight className="size-5" />
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* Detalle en tabla */}
+      <div className="mt-8">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+              <th className="hidden py-2 pr-3 font-semibold sm:table-cell">#</th>
+              <th className="py-2 pr-3 font-semibold">Candidato</th>
+              <th className="py-2 pr-3 text-right font-semibold">Votos</th>
+              <th className="py-2 text-right font-semibold">%</th>
+            </tr>
+          </thead>
+          <tbody>
+            {cargo.candidatos.map((c, i) => (
+              <tr key={c.id} className="border-b border-slate-100 last:border-0">
+                <td className="hidden py-2.5 pr-3 tabular-nums text-slate-400 sm:table-cell">{i + 1}</td>
+                <td className="py-2.5 pr-3 font-medium text-marca-950">{c.nombreCompleto}</td>
+                <td className="py-2.5 pr-3 text-right tabular-nums text-slate-700">{num(c.votos)}</td>
+                <td className="py-2.5 text-right font-semibold tabular-nums text-marca-800">{pct(c.porcentaje)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t border-slate-200 font-bold text-marca-950">
+              <td className="hidden py-2.5 pr-3 sm:table-cell" />
+              <td className="py-2.5 pr-3">Total</td>
+              <td className="py-2.5 pr-3 text-right tabular-nums">{num(cargo.total)}</td>
+              <td className="py-2.5 text-right tabular-nums">{cargo.total > 0 ? "100.000 %" : pct(0)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function Foto({ url, nombre, destacado }: { url: string | null; nombre: string; destacado: boolean }) {
+  const anillo = destacado ? "ring-[3px] ring-marca-500" : "ring-1 ring-slate-200";
+  if (url) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={url} alt="" className={`size-12 rounded-xl object-cover sm:size-16 ${anillo}`} />;
+  }
+  const ini = nombre.split(" ").filter(Boolean).slice(0, 2).map((p) => p[0]).join("");
+  return <span className={`grid size-12 place-items-center rounded-xl bg-marca-100 text-base font-bold text-marca-700 sm:size-16 sm:text-lg ${anillo}`}>{ini}</span>;
+}

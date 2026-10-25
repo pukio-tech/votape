@@ -8,26 +8,14 @@
  * en la base de datos solo se guarda su hash, así que ese archivo es la única copia.
  */
 import { prisma } from "../lib/prisma";
-import { escribirCsv, leerCsv, registrarPadron } from "./comun";
+import { escribirCsv, leerCsv, registrarPadron, validarPadron } from "./comun";
 
 async function main() {
   const ruta = process.argv.slice(2).find((a) => !a.startsWith("--"));
   if (!ruta) throw new Error("Indica el archivo: npm run padron:importar -- padron.csv");
   const regenerar = process.argv.includes("--regenerar");
 
-  const filas = leerCsv(ruta);
-  const errores: string[] = [];
-  const padron = filas.flatMap((f, i) => {
-    const codigo = f.codigo || f.codigoestudiante || f.codigouniversitario;
-    if (!codigo || !f.nombres || !f.apellidos) {
-      errores.push(`Fila ${i + 2}: falta código, nombres o apellidos.`);
-      return [];
-    }
-    return [{ codigoEstudiante: codigo, dni: f.dni || undefined, nombres: f.nombres, apellidos: f.apellidos, correo: f.correo || undefined }];
-  });
-
-  const repetidos = padron.map((p) => p.codigoEstudiante).filter((c, i, a) => a.indexOf(c) !== i);
-  if (repetidos.length) errores.push(`Códigos repetidos en el archivo: ${[...new Set(repetidos)].join(", ")}`);
+  const { padron, errores } = validarPadron(leerCsv(ruta));
   if (errores.length) throw new Error(`Corrige el archivo antes de importar:\n  ${errores.join("\n  ")}`);
 
   const tokens = await registrarPadron(padron, regenerar);

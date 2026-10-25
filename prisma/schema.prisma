@@ -109,3 +109,20 @@ model AuditoriaLog {
   ip          String?
   createdAt   DateTime          @default(now())
 }
+
+enum RolUsuario {
+  ADMIN       // acceso total al panel
+  OBSERVADOR  // solo ve el tablero de resultados
+}
+
+model UsuarioAdmin {
+  id            String     @id @default(cuid())
+  nombre        String
+  correo        String     @unique
+  passwordHash  String
+  rol           RolUsuario @default(OBSERVADOR)
+  activo        Boolean    @default(true)
+  ultimoAcceso  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}

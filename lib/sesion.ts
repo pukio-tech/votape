@@ -1,6 +1,8 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import type { RolUsuario } from "@prisma/client";
+import { prisma } from "./prisma";
 
 const COOKIE_VOTANTE = "vp_votante";
 const COOKIE_ADMIN = "vp_admin";
@@ -60,25 +62,24 @@ export async function cerrarSesionVotante() {
   (await cookies()).delete(COOKIE_VOTANTE);
 }
 
-export async function iniciarSesionAdmin() {
+export async function iniciarSesionAdmin(usuarioId: string) {
   const jar = await cookies();
-  jar.set(COOKIE_ADMIN, firmar({ sub: "admin", exp: Date.now() + TTL_ADMIN_MS }), opcionesCookie(TTL_ADMIN_MS));
+  jar.set(COOKIE_ADMIN, firmar({ sub: usuarioId, exp: Date.now() + TTL_ADMIN_MS }), opcionesCookie(TTL_ADMIN_MS));
 }
 
-export async function esAdmin(): Promise<boolean> {
+export type Admin = { id: string; nombre: string; correo: string; rol: RolUsuario };
+
+/** Devuelve el usuario del comité con sesión válida. Un usuario desactivado pierde el acceso al instante. */
+export async function obtenerAdmin(): Promise<Admin | null> {
   const jar = await cookies();
-  return verificar(jar.get(COOKIE_ADMIN)?.value)?.sub === "admin";
+  const id = verificar(jar.get(COOKIE_ADMIN)?.value)?.sub;
+  if (!id) return null;
+  return prisma.usuarioAdmin.findFirst({
+    where: { id, activo: true },
+    select: { id: true, nombre: true, correo: true, rol: true },
+  });
 }
 
 export async function cerrarSesionAdmin() {
   (await cookies()).delete(COOKIE_ADMIN);
-}
-
-/** Compara la contraseña del admin en tiempo constante. */
-export function passwordAdminValida(intento: string): boolean {
-  const real = process.env.ADMIN_PASSWORD;
-  if (!real) return false;
-  const a = createHmac("sha256", secreto()).update(intento).digest();
-  const b = createHmac("sha256", secreto()).update(real).digest();
-  return timingSafeEqual(a, b);
 }

@@ -1,6 +1,7 @@
 /**
- * Carga datos de DEMOSTRACIÓN: la elección de ejemplo (abierta desde ahora y por 3 días)
- * y 30 votantes ficticios. Los tokens quedan en salida/tokens-demo.csv.
+ * Carga datos de ejemplo para pruebas: la elección de datos/eleccion.ejemplo.json (abierta
+ * desde ahora y por 3 días), 30 votantes ficticios y el administrador inicial del .env.
+ * Los tokens quedan en salida/tokens-prueba.csv.
  *
  *   npm run db:seed            → solo si la BD no tiene votos registrados
  *   npm run db:seed -- --reset → borra TODO y vuelve a cargar
@@ -8,6 +9,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { prisma } from "../lib/prisma";
+import { asegurarAdminInicial } from "../lib/usuarios";
 import { crearEleccion, escribirCsv, registrarPadron, type DatosEleccion } from "../scripts/comun";
 
 const NOMBRES = ["Ana", "Luis", "Carmen", "Jorge", "Rocío", "Miguel", "Diana", "Raúl", "Elena", "Iván"];
@@ -36,7 +38,6 @@ async function main() {
   const proceso = await crearEleccion(
     {
       ...datos,
-      titulo: `${datos.titulo} (DEMO)`,
       fechaInicio: new Date(ahora.getTime() - 60 * 60 * 1000).toISOString(),
       fechaCierre: new Date(ahora.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString(),
     },
@@ -50,14 +51,16 @@ async function main() {
     apellidos: `${APELLIDOS[i % APELLIDOS.length]} ${APELLIDOS[(i * 3 + 1) % APELLIDOS.length]}`,
   }));
   const tokens = await registrarPadron(padron);
-  const ruta = escribirCsv("tokens-demo.csv", tokens);
+  const ruta = escribirCsv("tokens-prueba.csv", tokens);
 
   await prisma.auditoriaLog.create({
-    data: { procesoId: proceso.id, evento: "SEED", descripcion: "Datos de demostración cargados." },
+    data: { procesoId: proceso.id, evento: "CARGA_INICIAL", descripcion: "Datos iniciales cargados." },
   });
 
   console.log(`✔ Elección "${proceso.titulo}" creada (EN_PROCESO).`);
   console.log(`✔ ${tokens.length} votantes con token. Archivo: ${ruta}`);
+  const admin = await asegurarAdminInicial();
+  if (admin) console.log(`✔ Administrador inicial: ${admin.correo} (contraseña = ADMIN_PASSWORD del .env)`);
   console.log(`  Ejemplo → código ${tokens[0].codigo}  token ${tokens[0].token}`);
 }
 

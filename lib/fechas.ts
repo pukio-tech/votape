@@ -41,3 +41,10 @@ export function aInputLocal(fecha: Date | string): string {
 export function desdeInputLocal(valor: string): Date {
   return new Date(`${valor}:00${OFFSET}`);
 }
+
+/** "25/10/2026 a las 11:55:25 a. m." */
+export function formatearActualizado(fecha: Date | string): string {
+  const d = new Date(fecha);
+  const dia = new Intl.DateTimeFormat("es-PE", { timeZone: ZONA_HORARIA, day: "2-digit", month: "2-digit", year: "numeric" }).format(d);
+  return `${dia} a las ${formatearHora(d)}`;
+}

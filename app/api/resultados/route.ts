@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { calcularResultados } from "@/lib/resultados";
-import { esAdmin } from "@/lib/sesion";
 
+// Público: solo conteos agregados, sin datos de votantes.
 export async function GET() {
-  if (!(await esAdmin())) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   const resultados = await calcularResultados();
+  if (!resultados) return NextResponse.json({ error: "No hay proceso electoral." }, { status: 404 });
   return NextResponse.json(resultados, { headers: { "Cache-Control": "no-store" } });
 }

@@ -1,18 +1,57 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  /* Paleta institucional */
-  --color-marca-50: #eef3fb;
-  --color-marca-100: #d9e3f5;
-  --color-marca-200: #b3c7ea;
-  --color-marca-500: #2f5fb3;
-  --color-marca-600: #234c96;
-  --color-marca-700: #1b3c78;
-  --color-marca-800: #152f5e;
-  --color-marca-900: #0f2246;
+  /* Azul institucional (tipo ONPE) */
+  --color-marca-50: #eef4fb;
+  --color-marca-100: #d7e6f6;
+  --color-marca-200: #b0cdec;
+  --color-marca-300: #7fb0df;
+  --color-marca-400: #4b8bcb;
+  --color-marca-500: #2368b3;
+  --color-marca-600: #1a56a0;
+  --color-marca-700: #154785;
+  --color-marca-800: #0f3a6e;
+  --color-marca-900: #0a2a52;
+  --color-marca-950: #061b36;
+
+  /* Celeste de acento (barras de resultados, detalles) */
+  --color-acento-50: #f0f7fd;
+  --color-acento-100: #dceefa;
+  --color-acento-200: #bfdff4;
+  --color-acento-300: #a3cfee;
+  --color-acento-400: #87bee5;
+  --color-acento-500: #5fa5da;
+  --color-acento-600: #3d88c6;
+  --color-acento-700: #2c6ca3;
+  --color-acento-800: #23557f;
+
+  --color-lienzo: #f3f6fa;
+
+  --animate-aparecer: aparecer 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-subir: subir 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes aparecer {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes subir {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
 }
 
 :root {
@@ -20,8 +59,9 @@
 }
 
 body {
-  background: #f4f6fa;
-  color: #0f172a;
+  background: var(--color-lienzo);
+  color: var(--color-marca-950);
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Evita el zoom automático de iOS al enfocar inputs pequeños */
@@ -29,4 +69,13 @@ input,
 select,
 textarea {
   font-size: max(16px, 1em);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
