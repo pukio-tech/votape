@@ -1,0 +1,58 @@
+{
+  "titulo": "Elecciones Consejo Estudiantil 2026",
+  "institucion": "Universidad Nacional de San Martín",
+  "fechaInicio": "2026-11-12T08:00:00-05:00",
+  "fechaCierre": "2026-11-12T18:00:00-05:00",
+  "cargos": [
+    {
+      "nombre": "Presidencia",
+      "candidatos": [
+        {
+          "nombreCompleto": "María Fernanda Ríos Paredes",
+          "fotoUrl": "/candidatos/ejemplo-1.svg",
+          "propuestaResumen": "Lista Unidad Estudiantil. Comedor universitario con horario extendido, becas de transporte y un portal de transparencia del presupuesto estudiantil."
+        },
+        {
+          "nombreCompleto": "José Luis Panduro Tello",
+          "fotoUrl": "/candidatos/ejemplo-2.svg",
+          "propuestaResumen": "Lista Renovación. Wi-Fi en todos los pabellones, convenios de prácticas preprofesionales y una feria anual de emprendimiento."
+        },
+        {
+          "nombreCompleto": "Lucía Valera Shapiama",
+          "fotoUrl": "/candidatos/ejemplo-3.svg",
+          "propuestaResumen": "Lista Integración. Tutorías entre pares, salud mental con atención gratuita y deporte interfacultades cada semestre."
+        }
+      ]
+    },
+    {
+      "nombre": "Secretaría",
+      "candidatos": [
+        {
+          "nombreCompleto": "Carlos Andrés Tuanama Ruiz",
+          "fotoUrl": "/candidatos/ejemplo-4.svg",
+          "propuestaResumen": "Actas públicas de cada sesión del consejo en un máximo de 48 horas."
+        },
+        {
+          "nombreCompleto": "Ana Sofía Pinedo Vela",
+          "fotoUrl": "/candidatos/ejemplo-5.svg",
+          "propuestaResumen": "Buzón digital de sugerencias con respuesta obligatoria y seguimiento por facultad."
+        }
+      ]
+    },
+    {
+      "nombre": "Vocalía",
+      "candidatos": [
+        {
+          "nombreCompleto": "Diego Armando Satalaya Flores",
+          "fotoUrl": "/candidatos/ejemplo-6.svg",
+          "propuestaResumen": "Representación de los estudiantes de los primeros ciclos y orientación vocacional."
+        },
+        {
+          "nombreCompleto": "Valeria Isuiza Cárdenas",
+          "fotoUrl": "/candidatos/ejemplo-7.svg",
+          "propuestaResumen": "Campañas culturales y voluntariado ambiental en la región San Martín."
+        }
+      ]
+    }
+  ]
+}

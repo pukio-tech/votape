@@ -1,0 +1,111 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum EstadoEleccion {
+  CONFIGURACION
+  EN_PROCESO
+  FINALIZADO
+}
+
+enum EstadoToken {
+  PENDIENTE
+  USADO
+  ANULADO
+}
+
+model ProcesoElectoral {
+  id              String         @id @default(cuid())
+  titulo          String         // ej. Elecciones Consejo Estudiantil 2026
+  institucion     String?        // ej. UNSM
+  estado          EstadoEleccion @default(CONFIGURACION)
+  fechaInicio     DateTime
+  fechaCierre     DateTime
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  cargos          Cargo[]
+  votos           Voto[]
+  logs            AuditoriaLog[]
+}
+
+model Cargo {
+  id          String      @id @default(cuid())
+  procesoId   String
+  proceso     ProcesoElectoral @relation(fields: [procesoId], references: [id], onDelete: Cascade)
+  nombre      String      // ej. Presidencia, Secretaría
+  orden       Int         @default(0)
+  candidatos  Candidato[]
+  votos       Voto[]
+}
+
+model Candidato {
+  id               String   @id @default(cuid())
+  cargoId          String
+  cargo            Cargo    @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+  nombreCompleto   String
+  fotoUrl          String?
+  propuestaResumen String?  @db.Text
+  votos            Voto[]
+}
+
+model Votante {
+  id               String   @id @default(cuid())
+  codigoEstudiante String   @unique
+  dni              String?
+  nombres          String
+  apellidos        String
+  correo           String?
+
+  token            TokenAcceso?
+  participacion    RegistroParticipacion?
+
+  @@index([codigoEstudiante])
+}
+
+model TokenAcceso {
+  id              String      @id @default(cuid())
+  votanteId       String      @unique
+  votante         Votante     @relation(fields: [votanteId], references: [id], onDelete: Cascade)
+  tokenHash       String      @unique
+  estado          EstadoToken @default(PENDIENTE)
+  fechaGeneracion DateTime    @default(now())
+  fechaUso        DateTime?
+  ipUso           String?
+
+  @@index([tokenHash])
+}
+
+model RegistroParticipacion {
+  id             String   @id @default(cuid())
+  votanteId      String   @unique
+  votante        Votante  @relation(fields: [votanteId], references: [id], onDelete: Cascade)
+  fechaSufragio  DateTime @default(now())
+  constanciaHash String   @unique
+}
+
+model Voto {
+  id           String           @id @default(cuid())
+  procesoId    String
+  proceso      ProcesoElectoral @relation(fields: [procesoId], references: [id], onDelete: Cascade)
+  cargoId      String
+  cargo        Cargo            @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+  candidatoId  String
+  candidato    Candidato        @relation(fields: [candidatoId], references: [id], onDelete: Cascade)
+  fechaEmision DateTime         @default(now())
+}
+
+model AuditoriaLog {
+  id          String            @id @default(cuid())
+  procesoId   String?
+  proceso     ProcesoElectoral? @relation(fields: [procesoId], references: [id], onDelete: Cascade)
+  evento      String
+  descripcion String
+  ip          String?
+  createdAt   DateTime          @default(now())
+}

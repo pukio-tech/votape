@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* Paleta institucional */
+  --color-marca-50: #eef3fb;
+  --color-marca-100: #d9e3f5;
+  --color-marca-200: #b3c7ea;
+  --color-marca-500: #2f5fb3;
+  --color-marca-600: #234c96;
+  --color-marca-700: #1b3c78;
+  --color-marca-800: #152f5e;
+  --color-marca-900: #0f2246;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: #f4f6fa;
+  color: #0f172a;
+}
+
+/* Evita el zoom automático de iOS al enfocar inputs pequeños */
+input,
+select,
+textarea {
+  font-size: max(16px, 1em);
+}
