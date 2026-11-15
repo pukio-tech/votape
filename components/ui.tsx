@@ -25,7 +25,8 @@ export const tarjeta = "rounded-xl bg-white shadow-sm ring-1 ring-slate-200";
 /** Marca de la plataforma. El nombre se edita desde Jornada → Nombre de la plataforma. */
 export function Logo({ nombre, claro = false, compacto = false }: { nombre: string; claro?: boolean; compacto?: boolean }) {
   return (
-    <span className="inline-flex min-w-0 items-center gap-2.5" title={compacto ? nombre : undefined}>
+    // Compacto (solo ícono) nunca se encoge; con nombre, el texto se recorta pero el ícono se mantiene.
+    <span className={`inline-flex items-center gap-2.5 ${compacto ? "shrink-0" : "min-w-0"}`} title={compacto ? nombre : undefined}>
       <span
         className={`grid size-10 shrink-0 place-items-center rounded-xl ${
           claro ? "bg-white text-marca-700" : "bg-marca-700 text-white"

@@ -34,6 +34,7 @@ import {
 } from "@/app/admin/acciones-votantes";
 import { PanelLateral, piePanel } from "@/components/PanelLateral";
 import { Alerta, Insignia, boton, campo, tarjeta } from "@/components/ui";
+import { EditorPlantilla } from "@/components/admin/EditorPlantilla";
 import { formatearFecha } from "@/lib/fechas";
 
 type Votante = {
@@ -52,6 +53,7 @@ type Votante = {
 type Dialogo =
   | { tipo: "form"; votante?: Votante }
   | { tipo: "importar" }
+  | { tipo: "plantilla" }
   | { tipo: "eliminar"; votante: Votante }
   | { tipo: "token"; token: NonNullable<NonNullable<RespuestaVotante>["token"]> }
   | null;
@@ -80,12 +82,14 @@ export function GestionVotantes({
   total,
   paginas,
   resumen,
+  plantillaWhatsapp,
 }: {
   votantes: Votante[];
   filtros: { q: string; estado: string; pagina: number };
   total: number;
   paginas: number;
   resumen: { padron: number; pendientes: number; votaron: number; anulados: number };
+  plantillaWhatsapp: string;
 }) {
   const router = useRouter();
   const [dialogo, setDialogo] = useState<Dialogo>(null);
@@ -245,6 +249,9 @@ export function GestionVotantes({
           <button onClick={() => setDialogo({ tipo: "importar" })} className={boton.secundario}>
             <FileUp className="size-4" aria-hidden /> Importar CSV
           </button>
+          <button onClick={() => setDialogo({ tipo: "plantilla" })} className={`${boton.secundario} col-span-2 sm:col-auto`}>
+            <MessageCircle className="size-4 text-emerald-600" aria-hidden /> Mensaje de WhatsApp
+          </button>
           <button onClick={() => setDialogo({ tipo: "form" })} className={`${boton.primario} col-span-2 row-start-1 sm:col-auto`}>
             <Plus className="size-4" aria-hidden /> Nuevo votante
           </button>
@@ -384,6 +391,15 @@ export function GestionVotantes({
         />
       )}
       {dialogo?.tipo === "importar" && <FormImportar onCerrar={() => setDialogo(null)} onListo={() => router.refresh()} />}
+      {dialogo?.tipo === "plantilla" && (
+        <EditorPlantilla
+          plantilla={plantillaWhatsapp}
+          onCerrar={() => {
+            setDialogo(null);
+            router.refresh();
+          }}
+        />
+      )}
       {dialogo?.tipo === "token" && <TokenGenerado token={dialogo.token} onCerrar={() => setDialogo(null)} />}
       {dialogo?.tipo === "eliminar" && (
         <PanelLateral

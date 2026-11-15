@@ -141,7 +141,9 @@ model TokenEntrega {
 
 // Ajustes generales de la plataforma (una sola fila, id "general").
 model Ajustes {
-  id               String   @id @default("general")
-  nombrePlataforma String   @default("VotaPE")
-  updatedAt        DateTime @updatedAt
+  id                String   @id @default("general")
+  nombrePlataforma  String   @default("VotaPE")
+  // Plantilla del mensaje de WhatsApp con el acceso; null = plantilla por defecto.
+  plantillaWhatsapp String?  @db.Text
+  updatedAt         DateTime @updatedAt
 }

@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { z } from "zod";
+import { obtenerAjustes } from "@/lib/ajustes";
 import { exigirAdmin } from "@/lib/autorizacion";
 import { asignarToken, parsearCsv, registrarPadron, validarPadron } from "@/lib/padron";
 import { obtenerIp } from "@/lib/peticion";
+import { aplicarPlantilla, PLANTILLA_POR_DEFECTO } from "@/lib/plantilla";
 import { prisma } from "@/lib/prisma";
 import { obtenerProceso, registrarLog } from "@/lib/proceso";
 import { celularValido, enlaceWhatsapp, normalizarCelular } from "@/lib/telefono";
@@ -201,18 +203,34 @@ export async function mensajeWhatsapp(id: string): Promise<RespuestaVotante> {
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
   const protocolo = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  const proceso = await obtenerProceso();
-  const mensaje = [
-    `Hola ${votante.nombres.split(" ")[0]}, este es tu acceso para votar${proceso ? ` en *${proceso.titulo}*` : ""}:`,
-    "",
-    `Código: *${votante.codigoEstudiante}*`,
-    `Token: *${descifrarToken(votante.entrega.cifrado)}*`,
-    "",
-    `Ingresa aquí: ${protocolo}://${host}`,
-    "",
-    "Tu voto es secreto. No compartas tu token: solo sirve para votar una vez.",
-  ].join("\n");
+  const [proceso, { plantillaWhatsapp }] = await Promise.all([obtenerProceso(), obtenerAjustes()]);
+  const mensaje = aplicarPlantilla(plantillaWhatsapp, {
+    nombre: `${votante.nombres} ${votante.apellidos}`,
+    nombres: votante.nombres,
+    codigo: votante.codigoEstudiante,
+    token: descifrarToken(votante.entrega.cifrado),
+    enlace: `${protocolo}://${host}`,
+    eleccion: proceso?.titulo ?? "",
+  });
 
   await registrarLog("TOKEN_WHATSAPP", `${admin.nombre} preparó el envío por WhatsApp del token de ${votante.codigoEstudiante}.`, await obtenerIp());
   return { ok: true, mensaje: "", enlace: enlaceWhatsapp(votante.celular, mensaje) };
+}
+
+/** Guarda la plantilla del mensaje de WhatsApp. Vacía = vuelve a la plantilla por defecto. */
+export async function guardarPlantillaWhatsapp(_prev: RespuestaVotante, formData: FormData): Promise<RespuestaVotante> {
+  const admin = await exigirAdmin();
+  const texto = String(formData.get("plantilla") ?? "").replace(/\r\n/g, "\n").trim();
+  if (texto.length > 1000) return { ok: false, mensaje: "El mensaje admite hasta 1000 caracteres." };
+  if (texto && !texto.includes("{token}")) return { ok: false, mensaje: "El mensaje debe incluir {token}; si no, el votante no recibe su acceso." };
+
+  const plantillaWhatsapp = texto && texto !== PLANTILLA_POR_DEFECTO ? texto : null;
+  await prisma.ajustes.upsert({
+    where: { id: "general" },
+    create: { id: "general", plantillaWhatsapp },
+    update: { plantillaWhatsapp },
+  });
+  await registrarLog("AJUSTES_EDITADOS", `${admin.nombre} ${plantillaWhatsapp ? "editó" : "restableció"} el mensaje de WhatsApp.`, await obtenerIp());
+  revalidatePath("/admin/votantes");
+  return { ok: true, mensaje: plantillaWhatsapp ? "Mensaje guardado." : "Se restableció el mensaje por defecto." };
 }

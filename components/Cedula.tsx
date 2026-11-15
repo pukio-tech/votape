@@ -70,34 +70,6 @@ export function Cedula({ votante, codigo, cargos }: { votante: string; codigo: s
 
   return (
     <main className="flex-1 pb-32">
-      {/* Navegación por cargos */}
-      <div className="sticky top-16 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <nav className="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-4 py-3 sm:px-6" aria-label="Cargos">
-          {cargos.map((c, i) => {
-            const hecho = Boolean(selecciones[c.id]);
-            return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => irA(c.id)}
-                className={`flex shrink-0 items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3.5 text-sm font-medium ring-1 ring-inset transition ${
-                  hecho ? "bg-marca-800 text-white ring-marca-800" : "bg-white text-slate-600 ring-slate-300 hover:ring-marca-300"
-                }`}
-              >
-                <span
-                  className={`grid size-6 place-items-center rounded-full text-xs font-bold ${
-                    hecho ? "bg-acento-400 text-marca-950" : "bg-slate-100 text-slate-500"
-                  }`}
-                >
-                  {hecho ? <Check className="size-3.5" strokeWidth={3} aria-hidden /> : i + 1}
-                </span>
-                {c.nombre}
-              </button>
-            );
-          })}
-        </nav>
-      </div>
-
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="mt-6 flex flex-col gap-4 rounded-2xl bg-marca-50/70 p-5 ring-1 ring-inset ring-marca-100 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -118,7 +90,7 @@ export function Cedula({ votante, codigo, cargos }: { votante: string; codigo: s
             ref={(el) => {
               secciones.current[cargo.id] = el;
             }}
-            className="scroll-mt-36 pt-10"
+            className="scroll-mt-20 pt-10"
             aria-labelledby={`cargo-${cargo.id}`}
           >
             <div className="mb-4 flex items-end justify-between gap-3">

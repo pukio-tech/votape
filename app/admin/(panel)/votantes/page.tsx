@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { GestionVotantes } from "@/components/admin/GestionVotantes";
+import { obtenerAjustes } from "@/lib/ajustes";
 import { prisma } from "@/lib/prisma";
 import { obtenerAdmin } from "@/lib/sesion";
 
@@ -33,7 +34,7 @@ export default async function Votantes({
     ...(estado === "SIN_TOKEN" ? { token: { is: null } } : estado ? { token: { is: { estado } } } : {}),
   };
 
-  const [total, votantes, porEstado, padron] = await Promise.all([
+  const [total, votantes, porEstado, padron, { plantillaWhatsapp }] = await Promise.all([
     prisma.votante.count({ where }),
     prisma.votante.findMany({
       where,
@@ -54,6 +55,7 @@ export default async function Votantes({
     }),
     prisma.tokenAcceso.groupBy({ by: ["estado"], _count: { _all: true } }),
     prisma.votante.count(),
+    obtenerAjustes(),
   ]);
   const conteo = Object.fromEntries(porEstado.map((t) => [t.estado, t._count._all]));
 
@@ -68,6 +70,7 @@ export default async function Votantes({
       filtros={{ q, estado, pagina }}
       total={total}
       paginas={Math.max(1, Math.ceil(total / POR_PAGINA))}
+      plantillaWhatsapp={plantillaWhatsapp}
       resumen={{
         padron,
         pendientes: conteo.PENDIENTE ?? 0,
