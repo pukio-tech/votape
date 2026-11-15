@@ -6,7 +6,7 @@ import { useActionState, useState, useTransition } from "react";
 import type { Respuesta } from "@/app/admin/acciones";
 import { eliminarCandidato, eliminarCargo, guardarCandidato, guardarCargo, moverCargo } from "@/app/admin/acciones-eleccion";
 import { SubirFoto } from "@/components/admin/SubirFoto";
-import { Modal } from "@/components/Modal";
+import { PanelLateral, piePanel } from "@/components/PanelLateral";
 import { Alerta, boton, campo, tarjeta } from "@/components/ui";
 
 type Candidato = { id: string; nombreCompleto: string; fotoUrl: string | null; propuestaResumen: string | null };
@@ -20,7 +20,7 @@ type Dialogo =
   | null;
 
 const botonIcono =
-  "grid size-9 place-items-center rounded-lg text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50 hover:text-marca-700 disabled:opacity-40";
+  "grid size-10 place-items-center rounded-lg text-slate-500 sm:size-9 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50 hover:text-marca-700 disabled:opacity-40";
 
 export function GestionCandidatos({ cargos, hayVotos }: { cargos: Cargo[]; hayVotos: boolean }) {
   const router = useRouter();
@@ -130,7 +130,7 @@ export function GestionCandidatos({ cargos, hayVotos }: { cargos: Cargo[]; hayVo
                     ) : (
                       <p className="mt-1 text-sm italic text-slate-400">Sin propuesta</p>
                     )}
-                    <div className="mt-2 flex gap-3 text-sm font-semibold">
+                    <div className="mt-1 flex gap-1 text-sm font-semibold [&>button]:-mx-2 [&>button]:rounded-md [&>button]:px-2 [&>button]:py-2 [&>button:hover]:bg-slate-50">
                       <button onClick={() => setDialogo({ tipo: "candidato", cargoId: cargo.id, candidato: c })} className="text-marca-600 hover:text-marca-800">
                         Editar
                       </button>
@@ -168,7 +168,7 @@ export function GestionCandidatos({ cargos, hayVotos }: { cargos: Cargo[]; hayVo
         />
       )}
       {(dialogo?.tipo === "eliminar-cargo" || dialogo?.tipo === "eliminar-candidato") && (
-        <Modal
+        <PanelLateral
           titulo={dialogo.tipo === "eliminar-cargo" ? `¿Eliminar el cargo "${dialogo.cargo.nombre}"?` : `¿Eliminar a ${dialogo.candidato.nombreCompleto}?`}
           descripcion={
             dialogo.tipo === "eliminar-cargo" ? "También se eliminarán todos sus candidatos y sus fotos." : "Se eliminará también su foto."
@@ -193,7 +193,7 @@ export function GestionCandidatos({ cargos, hayVotos }: { cargos: Cargo[]; hayVo
           }
         >
           <p className="text-sm text-slate-600">Esta acción no se puede deshacer.</p>
-        </Modal>
+        </PanelLateral>
       )}
     </main>
   );
@@ -219,7 +219,7 @@ function FormCargo({ cargo, onCerrar, onListo }: { cargo?: Cargo; onCerrar: () =
   }, null);
 
   return (
-    <Modal titulo={cargo ? "Editar cargo" : "Nuevo cargo"} onCerrar={onCerrar}>
+    <PanelLateral titulo={cargo ? "Editar cargo" : "Nuevo cargo"} onCerrar={onCerrar}>
       <form action={accion} className="space-y-4">
         {cargo && <input type="hidden" name="id" value={cargo.id} />}
         <label className="block text-sm font-semibold text-marca-900">
@@ -227,7 +227,7 @@ function FormCargo({ cargo, onCerrar, onListo }: { cargo?: Cargo; onCerrar: () =
           <input name="nombre" required autoFocus defaultValue={cargo?.nombre} placeholder="Presidencia" className={`${campo} mt-1.5`} />
         </label>
         {estado && !estado.ok && <Alerta tipo="error">{estado.mensaje}</Alerta>}
-        <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+        <div className={piePanel}>
           <button type="button" onClick={onCerrar} className={boton.secundario}>
             Cancelar
           </button>
@@ -237,7 +237,7 @@ function FormCargo({ cargo, onCerrar, onListo }: { cargo?: Cargo; onCerrar: () =
           </button>
         </div>
       </form>
-    </Modal>
+    </PanelLateral>
   );
 }
 
@@ -264,7 +264,7 @@ function FormCandidato({
   }, null);
 
   return (
-    <Modal titulo={candidato ? "Editar candidato" : "Nuevo candidato"} onCerrar={onCerrar}>
+    <PanelLateral titulo={candidato ? "Editar candidato" : "Nuevo candidato"} onCerrar={onCerrar}>
       <form action={accion} className="space-y-4">
         {candidato && <input type="hidden" name="id" value={candidato.id} />}
         <div>
@@ -306,7 +306,7 @@ function FormCandidato({
           <span className="mt-1 block text-right text-xs font-normal text-slate-400">{propuesta.length}/400</span>
         </label>
         {estado && !estado.ok && <Alerta tipo="error">{estado.mensaje}</Alerta>}
-        <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+        <div className={piePanel}>
           <button type="button" onClick={onCerrar} className={boton.secundario}>
             Cancelar
           </button>
@@ -316,6 +316,6 @@ function FormCandidato({
           </button>
         </div>
       </form>
-    </Modal>
+    </PanelLateral>
   );
 }

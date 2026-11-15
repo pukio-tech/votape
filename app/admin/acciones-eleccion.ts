@@ -187,3 +187,20 @@ export async function eliminarCandidato(id: string): Promise<Respuesta> {
   refrescar();
   return { ok: true, mensaje: `${candidato.nombreCompleto} eliminado.` };
 }
+
+// ---------- Ajustes de la plataforma ----------
+
+export async function guardarNombrePlataforma(_prev: Respuesta, formData: FormData): Promise<Respuesta> {
+  const admin = await exigirAdmin();
+  const nombre = z.string().trim().min(2, "El nombre debe tener al menos 2 caracteres.").max(40, "Máximo 40 caracteres.").safeParse(formData.get("nombre"));
+  if (!nombre.success) return { ok: false, mensaje: nombre.error.issues[0].message };
+
+  await prisma.ajustes.upsert({
+    where: { id: "general" },
+    create: { id: "general", nombrePlataforma: nombre.data },
+    update: { nombrePlataforma: nombre.data },
+  });
+  await registrarLog("AJUSTES_EDITADOS", `${admin.nombre} cambió el nombre de la plataforma a "${nombre.data}".`, await obtenerIp());
+  revalidatePath("/", "layout");
+  return { ok: true, mensaje: `La plataforma ahora se llama "${nombre.data}".` };
+}

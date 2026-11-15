@@ -4,7 +4,7 @@ import { ArrowRight, BarChart3, Check, CheckCircle2, Copy, Loader2, Printer, Shi
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { formatearFecha } from "@/lib/fechas";
-import { Modal } from "./Modal";
+import { PanelLateral } from "./PanelLateral";
 import { Alerta, boton, tarjeta } from "./ui";
 
 type Candidato = { id: string; nombreCompleto: string; fotoUrl: string | null; propuestaResumen: string | null };
@@ -301,7 +301,7 @@ function Confirmacion({
   const error = fase.tipo === "error" ? fase : null;
 
   return (
-    <Modal
+    <PanelLateral
       titulo="Revisa tu voto"
       descripcion="Al confirmar, tu voto se registra de forma definitiva y tu token se desactiva."
       onCerrar={enviando || error?.fatal ? undefined : onCancelar}
@@ -342,7 +342,7 @@ function Confirmacion({
           <Alerta tipo="error">{error.mensaje}</Alerta>
         </div>
       )}
-    </Modal>
+    </PanelLateral>
   );
 }
 

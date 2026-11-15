@@ -25,6 +25,7 @@ export function NavAdmin({ esAdmin }: { esAdmin: boolean }) {
               key={href}
               href={href}
               aria-current={activo ? "page" : undefined}
+              ref={activo ? (el) => el?.scrollIntoView({ block: "nearest", inline: "center" }) : undefined}
               className={`flex shrink-0 items-center gap-2 px-4 py-3 text-sm font-semibold transition ${
                 activo ? "bg-marca-600 text-white" : "text-marca-200 hover:bg-white/5 hover:text-white"
               }`}

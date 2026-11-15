@@ -4,7 +4,7 @@ import { CalendarClock, Loader2, Pause, Play, Power, RotateCcw, Square } from "l
 import { useRouter } from "next/navigation";
 import { useActionState, useState, useTransition } from "react";
 import { cambiarEstado, guardarHorario, type Respuesta } from "@/app/admin/acciones";
-import { Modal } from "@/components/Modal";
+import { PanelLateral } from "@/components/PanelLateral";
 import { Alerta, Insignia, boton, campo, tarjeta } from "@/components/ui";
 import { aInputLocal, formatearFecha } from "@/lib/fechas";
 
@@ -123,7 +123,7 @@ export function ControlJornada({ proceso, ahora }: { proceso: Proceso; ahora: st
       </section>
 
       {confirmando && (
-        <Modal
+        <PanelLateral
           titulo={confirmando.titulo}
           descripcion={confirmando.texto}
           onCerrar={() => !cambiando && setConfirmando(null)}
@@ -142,7 +142,7 @@ export function ControlJornada({ proceso, ahora }: { proceso: Proceso; ahora: st
           <p className="text-sm text-slate-600">
             Horario vigente: {formatearFecha(proceso.fechaInicio)} — {formatearFecha(proceso.fechaCierre)}.
           </p>
-        </Modal>
+        </PanelLateral>
       )}
     </div>
   );

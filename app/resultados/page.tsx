@@ -7,7 +7,7 @@ import { TableroResultados } from "@/components/resultados/TableroResultados";
 import { Alerta } from "@/components/ui";
 import { calcularResultados } from "@/lib/resultados";
 
-export const metadata: Metadata = { title: "Resultados en vivo · Votación Estudiantil" };
+export const metadata: Metadata = { title: "Resultados en vivo" };
 
 export default async function ResultadosPublicos() {
   await connection();

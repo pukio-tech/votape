@@ -22,9 +22,10 @@ export const tarjeta = "rounded-xl bg-white shadow-sm ring-1 ring-slate-200";
 
 /* ---------- Componentes ---------- */
 
-export function Logo({ claro = false, compacto = false }: { claro?: boolean; compacto?: boolean }) {
+/** Marca de la plataforma. El nombre se edita desde Jornada → Nombre de la plataforma. */
+export function Logo({ nombre, claro = false, compacto = false }: { nombre: string; claro?: boolean; compacto?: boolean }) {
   return (
-    <span className="inline-flex items-center gap-2.5">
+    <span className="inline-flex min-w-0 items-center gap-2.5" title={compacto ? nombre : undefined}>
       <span
         className={`grid size-10 shrink-0 place-items-center rounded-xl ${
           claro ? "bg-white text-marca-700" : "bg-marca-700 text-white"
@@ -33,9 +34,7 @@ export function Logo({ claro = false, compacto = false }: { claro?: boolean; com
         <Vote className="size-5" strokeWidth={2.2} aria-hidden />
       </span>
       {!compacto && (
-        <span className={`text-lg font-bold tracking-tight ${claro ? "text-white" : "text-marca-900"}`}>
-          Vota<span className={claro ? "text-acento-300" : "text-marca-500"}>PE</span>
-        </span>
+        <span className={`truncate text-lg font-bold tracking-tight ${claro ? "text-white" : "text-marca-900"}`}>{nombre}</span>
       )}
     </span>
   );

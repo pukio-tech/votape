@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useActionState, useState, useTransition } from "react";
 import { cambiarAccesoUsuario, cambiarRol, crearUsuario, restablecerPassword, type Respuesta } from "@/app/admin/acciones";
 import { CampoPassword } from "@/components/CampoPassword";
-import { Modal } from "@/components/Modal";
+import { PanelLateral, piePanel } from "@/components/PanelLateral";
 import { Alerta, Campo, Insignia, boton, campo, tarjeta } from "@/components/ui";
 import { formatearFecha } from "@/lib/fechas";
 
@@ -188,7 +188,7 @@ function FormNuevoUsuario({ onCerrar, onCreado }: { onCerrar: () => void; onCrea
   }, null);
 
   return (
-    <Modal titulo="Nuevo usuario del comité" descripcion="Podrá ingresar al panel con este correo y contraseña." onCerrar={onCerrar}>
+    <PanelLateral titulo="Nuevo usuario del comité" descripcion="Podrá ingresar al panel con este correo y contraseña." onCerrar={onCerrar}>
       <form action={accion} className="space-y-4">
         <Campo etiqueta="Nombre completo" htmlFor="nombre" icono={<UserRound />}>
           <input
@@ -235,7 +235,7 @@ function FormNuevoUsuario({ onCerrar, onCreado }: { onCerrar: () => void; onCrea
           <CampoPassword id="password-nuevo" name="password" autoComplete="new-password" minLength={8} />
         </Campo>
         {estado && !estado.ok && <Alerta tipo="error">{estado.mensaje}</Alerta>}
-        <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+        <div className={piePanel}>
           <button type="button" onClick={onCerrar} className={boton.secundario}>
             Cancelar
           </button>
@@ -245,7 +245,7 @@ function FormNuevoUsuario({ onCerrar, onCreado }: { onCerrar: () => void; onCrea
           </button>
         </div>
       </form>
-    </Modal>
+    </PanelLateral>
   );
 }
 
@@ -267,7 +267,7 @@ function FormPassword({
   }, null);
 
   return (
-    <Modal
+    <PanelLateral
       titulo={esYo ? "Cambiar tu contraseña" : `Restablecer contraseña`}
       descripcion={esYo ? "Úsala desde tu próximo ingreso." : `Comparte la nueva contraseña con ${usuario.nombre} por un canal seguro.`}
       onCerrar={onCerrar}
@@ -278,7 +278,7 @@ function FormPassword({
           <CampoPassword id="password-cambio" name="password" autoComplete="new-password" minLength={8} />
         </Campo>
         {estado && !estado.ok && <Alerta tipo="error">{estado.mensaje}</Alerta>}
-        <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+        <div className={piePanel}>
           <button type="button" onClick={onCerrar} className={boton.secundario}>
             Cancelar
           </button>
@@ -288,6 +288,6 @@ function FormPassword({
           </button>
         </div>
       </form>
-    </Modal>
+    </PanelLateral>
   );
 }

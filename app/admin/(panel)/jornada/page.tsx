@@ -2,8 +2,10 @@ import { Ban, KeyRound, Users, Vote } from "lucide-react";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { ControlJornada } from "@/components/admin/ControlJornada";
+import { FormNombrePlataforma } from "@/components/admin/FormNombrePlataforma";
 import { FormProceso } from "@/components/admin/FormProceso";
 import { tarjeta } from "@/components/ui";
+import { obtenerAjustes } from "@/lib/ajustes";
 import { prisma } from "@/lib/prisma";
 import { obtenerProceso } from "@/lib/proceso";
 import { obtenerAdmin } from "@/lib/sesion";
@@ -11,11 +13,12 @@ import { obtenerAdmin } from "@/lib/sesion";
 export default async function Jornada() {
   if ((await obtenerAdmin())?.rol !== "ADMIN") redirect("/admin");
 
-  const [proceso, padron, votaron, tokens] = await Promise.all([
+  const [proceso, padron, votaron, tokens, { nombrePlataforma }] = await Promise.all([
     obtenerProceso(),
     prisma.votante.count(),
     prisma.registroParticipacion.count(),
     prisma.tokenAcceso.groupBy({ by: ["estado"], _count: { _all: true } }),
+    obtenerAjustes(),
   ]);
   if (!proceso) {
     return (
@@ -55,6 +58,13 @@ export default async function Jornada() {
         <h3 className="font-bold text-marca-950">Datos del proceso</h3>
         <div className="mt-4">
           <FormProceso proceso={{ titulo: proceso.titulo, institucion: proceso.institucion }} />
+        </div>
+      </section>
+
+      <section className={`${tarjeta} mt-6 p-5 sm:p-6`}>
+        <h3 className="font-bold text-marca-950">Nombre de la plataforma</h3>
+        <div className="mt-4">
+          <FormNombrePlataforma nombre={nombrePlataforma} />
         </div>
       </section>
     </main>

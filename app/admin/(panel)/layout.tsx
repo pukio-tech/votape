@@ -4,10 +4,11 @@ import { redirect } from "next/navigation";
 import { salirAdmin } from "@/app/admin/acciones";
 import { NavAdmin } from "@/components/admin/NavAdmin";
 import { Logo } from "@/components/ui";
+import { obtenerAjustes } from "@/lib/ajustes";
 import { obtenerAdmin } from "@/lib/sesion";
 
 export default async function LayoutPanel({ children }: { children: ReactNode }) {
-  const admin = await obtenerAdmin();
+  const [admin, { nombrePlataforma }] = await Promise.all([obtenerAdmin(), obtenerAjustes()]);
   if (!admin) redirect("/admin/login");
 
   const iniciales = admin.nombre
@@ -22,7 +23,7 @@ export default async function LayoutPanel({ children }: { children: ReactNode })
     <>
       <header className="sticky top-0 z-30 bg-marca-800 text-white shadow-sm shadow-marca-950/20">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
-          <Logo claro />
+          <Logo nombre={nombrePlataforma} claro />
           <span className="hidden h-6 w-px bg-white/15 sm:block" aria-hidden />
           <span className="hidden text-sm font-medium text-marca-200 sm:block">Comité electoral</span>
 

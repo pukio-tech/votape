@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
+import { obtenerAjustes } from "@/lib/ajustes";
 import "./globals.css";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -12,14 +13,17 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Votación Estudiantil",
-  description: "Sistema de votación electoral estudiantil con voto único y secreto.",
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { nombrePlataforma } = await obtenerAjustes();
+  return {
+    title: { default: nombrePlataforma, template: `%s · ${nombrePlataforma}` },
+    description: "Sistema de votación electoral con voto único y secreto.",
+    robots: { index: false, follow: false },
+  };
+}
 
 export const viewport: Viewport = {
-  themeColor: "#13294b",
+  themeColor: "#0f3a6e",
   width: "device-width",
   initialScale: 1,
 };

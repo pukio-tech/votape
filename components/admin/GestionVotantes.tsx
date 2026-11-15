@@ -30,7 +30,7 @@ import {
   verToken,
   type RespuestaVotante,
 } from "@/app/admin/acciones-votantes";
-import { Modal } from "@/components/Modal";
+import { PanelLateral, piePanel } from "@/components/PanelLateral";
 import { Alerta, Insignia, boton, campo, tarjeta } from "@/components/ui";
 import { formatearFecha } from "@/lib/fechas";
 
@@ -69,7 +69,7 @@ function InsigniaEstado({ estado }: { estado: Votante["estado"] }) {
 }
 
 const botonIcono =
-  "grid size-8 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-marca-700 disabled:pointer-events-none disabled:opacity-30";
+  "grid size-10 place-items-center rounded-lg text-slate-500 md:size-8 transition hover:bg-slate-100 hover:text-marca-700 disabled:pointer-events-none disabled:opacity-30";
 
 export function GestionVotantes({
   votantes,
@@ -137,6 +137,70 @@ export function GestionVotantes({
     });
   }
 
+  const vacio = filtros.q || filtros.estado ? "No hay votantes que coincidan con la búsqueda." : "Aún no hay votantes. Regístralos o importa un CSV.";
+
+  const celdaToken = (v: Votante) =>
+    v.estado === "USADO" ? (
+      <span className="text-xs text-slate-400">Ya usado</span>
+    ) : v.estado && v.tieneCopia ? (
+      <div className="flex items-center gap-1">
+        <span className={`font-mono text-sm tracking-wider ${visibles[v.id] ? "font-semibold text-marca-950" : "text-slate-400"}`}>
+          {visibles[v.id] ?? "•••••-•••••"}
+        </span>
+        <button
+          className={botonIcono}
+          disabled={pendiente}
+          onClick={() => alternarToken(v)}
+          title={visibles[v.id] ? "Ocultar token" : "Ver token"}
+          aria-label={`${visibles[v.id] ? "Ocultar" : "Ver"} token de ${v.codigoEstudiante}`}
+        >
+          {visibles[v.id] ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+        </button>
+        {visibles[v.id] && (
+          <button className={botonIcono} onClick={() => copiar(v.id, visibles[v.id])} title="Copiar token" aria-label={`Copiar token de ${v.codigoEstudiante}`}>
+            {copiado === v.id ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
+          </button>
+        )}
+      </div>
+    ) : (
+      <span className="text-xs text-slate-400">{v.estado ? "Genera uno nuevo para verlo" : "—"}</span>
+    );
+
+  const acciones = (v: Votante) => (
+    <>
+      <button className={botonIcono} onClick={() => setDialogo({ tipo: "form", votante: v })} title="Editar" aria-label={`Editar a ${v.codigoEstudiante}`}>
+        <Pencil className="size-4" />
+      </button>
+      <button
+        className={botonIcono}
+        disabled={v.estado === "USADO" || pendiente}
+        onClick={() => ejecutar(() => regenerarToken(v.id))}
+        title={v.estado ? "Generar token nuevo" : "Generar token"}
+        aria-label={`Generar token para ${v.codigoEstudiante}`}
+      >
+        <KeyRound className="size-4" />
+      </button>
+      <button
+        className={`${botonIcono} hover:text-red-600`}
+        disabled={v.estado !== "PENDIENTE" || pendiente}
+        onClick={() => ejecutar(() => anularToken(v.id))}
+        title="Anular token"
+        aria-label={`Anular token de ${v.codigoEstudiante}`}
+      >
+        <Ban className="size-4" />
+      </button>
+      <button
+        className={`${botonIcono} hover:text-red-600`}
+        disabled={v.estado === "USADO"}
+        onClick={() => setDialogo({ tipo: "eliminar", votante: v })}
+        title="Eliminar"
+        aria-label={`Eliminar a ${v.codigoEstudiante}`}
+      >
+        <Trash2 className="size-4" />
+      </button>
+    </>
+  );
+
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -147,14 +211,14 @@ export function GestionVotantes({
             {resumen.anulados ? ` · ${resumen.anulados} anulados` : ""}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
           <button onClick={descargarTodos} disabled={pendiente} className={boton.secundario}>
             <Download className="size-4" aria-hidden /> Descargar tokens
           </button>
           <button onClick={() => setDialogo({ tipo: "importar" })} className={boton.secundario}>
             <FileUp className="size-4" aria-hidden /> Importar CSV
           </button>
-          <button onClick={() => setDialogo({ tipo: "form" })} className={boton.primario}>
+          <button onClick={() => setDialogo({ tipo: "form" })} className={`${boton.primario} col-span-2 row-start-1 sm:col-auto`}>
             <Plus className="size-4" aria-hidden /> Nuevo votante
           </button>
         </div>
@@ -184,14 +248,42 @@ export function GestionVotantes({
       )}
 
       <div className={`${tarjeta} mt-4 overflow-hidden`}>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-sm">
+        {/* Celular: tarjetas */}
+        <ul className="divide-y divide-slate-100 md:hidden">
+          {votantes.length === 0 && <li className="px-4 py-12 text-center text-sm text-slate-500">{vacio}</li>}
+          {votantes.map((v) => (
+            <li key={v.id} className="px-4 py-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-semibold leading-snug text-marca-950">
+                    {v.apellidos}, {v.nombres}
+                  </p>
+                  <p className="mt-0.5 font-mono text-sm text-slate-500">
+                    {v.codigoEstudiante}
+                    {v.dni ? ` · DNI ${v.dni}` : ""}
+                  </p>
+                  {v.correo && <p className="truncate text-sm text-slate-500">{v.correo}</p>}
+                </div>
+                <InsigniaEstado estado={v.estado} />
+              </div>
+              <div className="mt-3 flex min-h-11 items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-1">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Token</span>
+                {celdaToken(v)}
+              </div>
+              <div className="mt-2 flex justify-end gap-1">{acciones(v)}</div>
+            </li>
+          ))}
+        </ul>
+
+        {/* Escritorio: tabla */}
+        <div className="hidden overflow-x-auto md:block">
+          <table className="w-full text-sm">
             <thead className="bg-marca-800 text-left text-xs uppercase tracking-wide text-white">
               <tr>
                 <th className="px-4 py-3 font-semibold">Código</th>
                 <th className="px-4 py-3 font-semibold">DNI</th>
                 <th className="px-4 py-3 font-semibold">Apellidos y nombres</th>
-                <th className="px-4 py-3 font-semibold">Correo</th>
+                <th className="hidden px-4 py-3 font-semibold lg:table-cell">Correo</th>
                 <th className="px-4 py-3 font-semibold">Estado</th>
                 <th className="px-4 py-3 font-semibold">Token</th>
                 <th className="px-4 py-3 text-right font-semibold">Acciones</th>
@@ -201,7 +293,7 @@ export function GestionVotantes({
               {votantes.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
-                    {filtros.q || filtros.estado ? "No hay votantes que coincidan con la búsqueda." : "Aún no hay votantes. Regístralos o importa un CSV."}
+                    {vacio}
                   </td>
                 </tr>
               )}
@@ -212,97 +304,36 @@ export function GestionVotantes({
                   <td className="px-4 py-3 font-medium text-marca-950">
                     {v.apellidos}, {v.nombres}
                   </td>
-                  <td className="max-w-48 truncate px-4 py-3 text-slate-600">{v.correo ?? "—"}</td>
+                  <td className="hidden max-w-48 truncate px-4 py-3 text-slate-600 lg:table-cell">{v.correo ?? "—"}</td>
                   <td className="whitespace-nowrap px-4 py-3" title={v.fechaUso ? `Votó el ${formatearFecha(v.fechaUso)}` : undefined}>
                     <InsigniaEstado estado={v.estado} />
                   </td>
-                  <td className="whitespace-nowrap px-4 py-2">
-                    {v.estado === "USADO" ? (
-                      <span className="text-xs text-slate-400">Ya usado</span>
-                    ) : v.estado && v.tieneCopia ? (
-                      <div className="flex items-center gap-1">
-                        <span className={`font-mono text-sm tracking-wider ${visibles[v.id] ? "font-semibold text-marca-950" : "text-slate-400"}`}>
-                          {visibles[v.id] ?? "•••••-•••••"}
-                        </span>
-                        <button
-                          className={botonIcono}
-                          disabled={pendiente}
-                          onClick={() => alternarToken(v)}
-                          title={visibles[v.id] ? "Ocultar token" : "Ver token"}
-                          aria-label={`${visibles[v.id] ? "Ocultar" : "Ver"} token de ${v.codigoEstudiante}`}
-                        >
-                          {visibles[v.id] ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                        </button>
-                        {visibles[v.id] && (
-                          <button
-                            className={botonIcono}
-                            onClick={() => copiar(v.id, visibles[v.id])}
-                            title="Copiar token"
-                            aria-label={`Copiar token de ${v.codigoEstudiante}`}
-                          >
-                            {copiado === v.id ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
-                          </button>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-400">{v.estado ? "Genera uno nuevo para verlo" : "—"}</span>
-                    )}
-                  </td>
+                  <td className="whitespace-nowrap px-4 py-2">{celdaToken(v)}</td>
                   <td className="px-4 py-2">
-                    <div className="flex justify-end gap-0.5">
-                      <button className={botonIcono} onClick={() => setDialogo({ tipo: "form", votante: v })} title="Editar" aria-label={`Editar a ${v.codigoEstudiante}`}>
-                        <Pencil className="size-4" />
-                      </button>
-                      <button
-                        className={botonIcono}
-                        disabled={v.estado === "USADO" || pendiente}
-                        onClick={() => ejecutar(() => regenerarToken(v.id))}
-                        title={v.estado ? "Generar token nuevo" : "Generar token"}
-                        aria-label={`Generar token para ${v.codigoEstudiante}`}
-                      >
-                        <KeyRound className="size-4" />
-                      </button>
-                      <button
-                        className={`${botonIcono} hover:text-red-600`}
-                        disabled={v.estado !== "PENDIENTE" || pendiente}
-                        onClick={() => ejecutar(() => anularToken(v.id))}
-                        title="Anular token"
-                        aria-label={`Anular token de ${v.codigoEstudiante}`}
-                      >
-                        <Ban className="size-4" />
-                      </button>
-                      <button
-                        className={`${botonIcono} hover:text-red-600`}
-                        disabled={v.estado === "USADO"}
-                        onClick={() => setDialogo({ tipo: "eliminar", votante: v })}
-                        title="Eliminar"
-                        aria-label={`Eliminar a ${v.codigoEstudiante}`}
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
-                    </div>
+                    <div className="flex justify-end gap-0.5">{acciones(v)}</div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 text-sm text-slate-500">
+
+        <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <span>
             {total.toLocaleString("es-PE")} {total === 1 ? "resultado" : "resultados"} · página {filtros.pagina} de {paginas}
           </span>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:flex">
             <Link
               href={url({ pagina: filtros.pagina - 1 })}
               aria-disabled={filtros.pagina <= 1}
-              className={`${boton.secundario} px-3 py-1.5 ${filtros.pagina <= 1 ? "pointer-events-none opacity-40" : ""}`}
+              className={`${boton.secundario} px-3 py-2 ${filtros.pagina <= 1 ? "pointer-events-none opacity-40" : ""}`}
             >
               <ChevronLeft className="size-4" aria-hidden /> Anterior
             </Link>
             <Link
               href={url({ pagina: filtros.pagina + 1 })}
               aria-disabled={filtros.pagina >= paginas}
-              className={`${boton.secundario} px-3 py-1.5 ${filtros.pagina >= paginas ? "pointer-events-none opacity-40" : ""}`}
+              className={`${boton.secundario} px-3 py-2 ${filtros.pagina >= paginas ? "pointer-events-none opacity-40" : ""}`}
             >
               Siguiente <ChevronRight className="size-4" aria-hidden />
             </Link>
@@ -324,7 +355,7 @@ export function GestionVotantes({
       {dialogo?.tipo === "importar" && <FormImportar onCerrar={() => setDialogo(null)} onListo={() => router.refresh()} />}
       {dialogo?.tipo === "token" && <TokenGenerado token={dialogo.token} onCerrar={() => setDialogo(null)} />}
       {dialogo?.tipo === "eliminar" && (
-        <Modal
+        <PanelLateral
           titulo={`¿Eliminar a ${dialogo.votante.nombres} ${dialogo.votante.apellidos}?`}
           descripcion={`Código ${dialogo.votante.codigoEstudiante}. Su token dejará de funcionar.`}
           onCerrar={() => !pendiente && setDialogo(null)}
@@ -341,7 +372,7 @@ export function GestionVotantes({
           }
         >
           <p className="text-sm text-slate-600">Esta acción no se puede deshacer.</p>
-        </Modal>
+        </PanelLateral>
       )}
     </main>
   );
@@ -363,7 +394,7 @@ function FormVotante({
   }, null);
 
   return (
-    <Modal
+    <PanelLateral
       titulo={votante ? "Editar votante" : "Nuevo votante"}
       descripcion={votante ? undefined : "Al guardar se genera su token de acceso personal."}
       onCerrar={onCerrar}
@@ -393,7 +424,7 @@ function FormVotante({
           <input name="correo" type="email" defaultValue={votante?.correo ?? ""} placeholder="rosa.huaman@unsm.edu.pe" className={`${campo} mt-1.5`} />
         </label>
         {estado && !estado.ok && <Alerta tipo="error">{estado.mensaje}</Alerta>}
-        <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+        <div className={piePanel}>
           <button type="button" onClick={onCerrar} className={boton.secundario}>
             Cancelar
           </button>
@@ -403,14 +434,14 @@ function FormVotante({
           </button>
         </div>
       </form>
-    </Modal>
+    </PanelLateral>
   );
 }
 
 function TokenGenerado({ token, onCerrar }: { token: NonNullable<NonNullable<RespuestaVotante>["token"]>; onCerrar: () => void }) {
   const [copiado, setCopiado] = useState(false);
   return (
-    <Modal
+    <PanelLateral
       titulo="Token de acceso"
       descripcion="Entrégalo al votante. También puedes consultarlo después en la tabla."
       onCerrar={onCerrar}
@@ -437,7 +468,7 @@ function TokenGenerado({ token, onCerrar }: { token: NonNullable<NonNullable<Res
           {copiado ? "Copiado" : "Copiar token"}
         </button>
       </div>
-    </Modal>
+    </PanelLateral>
   );
 }
 
@@ -460,7 +491,7 @@ function FormImportar({ onCerrar, onListo }: { onCerrar: () => void; onListo: ()
   }, null);
 
   return (
-    <Modal titulo="Importar padrón" descripcion="Exporta tu Excel como «CSV UTF-8» con estas columnas:" onCerrar={pendiente ? undefined : onCerrar}>
+    <PanelLateral titulo="Importar padrón" descripcion="Exporta tu Excel como «CSV UTF-8» con estas columnas:" onCerrar={pendiente ? undefined : onCerrar}>
       {estado?.ok ? (
         <div className="space-y-4">
           <Alerta tipo="exito">{estado.mensaje}</Alerta>
@@ -504,7 +535,7 @@ function FormImportar({ onCerrar, onListo }: { onCerrar: () => void; onListo: ()
               )}
             </Alerta>
           )}
-          <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+          <div className={piePanel}>
             <button type="button" onClick={onCerrar} disabled={pendiente} className={boton.secundario}>
               Cancelar
             </button>
@@ -515,6 +546,6 @@ function FormImportar({ onCerrar, onListo }: { onCerrar: () => void; onListo: ()
           </div>
         </form>
       )}
-    </Modal>
+    </PanelLateral>
   );
 }

@@ -137,3 +137,10 @@ model TokenEntrega {
   cifrado   String
   updatedAt DateTime @updatedAt
 }
+
+// Ajustes generales de la plataforma (una sola fila, id "general").
+model Ajustes {
+  id               String   @id @default("general")
+  nombrePlataforma String   @default("VotaPE")
+  updatedAt        DateTime @updatedAt
+}
