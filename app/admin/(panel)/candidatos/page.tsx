@@ -29,6 +29,7 @@ export default async function Candidatos() {
       select: {
         id: true,
         nombre: true,
+        maxSelecciones: true,
         candidatos: {
           orderBy: { nombreCompleto: "asc" },
           select: { id: true, nombreCompleto: true, fotoUrl: true, propuestaResumen: true },

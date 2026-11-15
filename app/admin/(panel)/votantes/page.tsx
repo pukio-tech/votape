@@ -49,6 +49,7 @@ export default async function Votantes({
         apellidos: true,
         correo: true,
         celular: true,
+        fotoUrl: true,
         token: { select: { estado: true, fechaUso: true } },
         entrega: { select: { id: true } },
       },

@@ -22,7 +22,18 @@ async function reducir(archivo: File, tipo: "image/jpeg" | "image/png"): Promise
  * Selector de imagen que la sube a S3 y deja la URL en un input oculto `name`.
  * `logo`: guarda en PNG (con transparencia) en la carpeta de marca y la muestra sin recortar.
  */
-export function SubirFoto({ name, inicial, logo = false }: { name: string; inicial?: string | null; logo?: boolean }) {
+export function SubirFoto({
+  name,
+  inicial,
+  logo = false,
+  carpeta = "candidatos",
+}: {
+  name: string;
+  inicial?: string | null;
+  logo?: boolean;
+  /** Carpeta del bucket para fotos (las de votantes son privadas). */
+  carpeta?: "candidatos" | "votantes";
+}) {
   const [url, setUrl] = useState(inicial ?? "");
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState("");
@@ -36,7 +47,7 @@ export function SubirFoto({ name, inicial, logo = false }: { name: string; inici
     try {
       const datos = new FormData();
       datos.append("archivo", await reducir(archivo, logo ? "image/png" : "image/jpeg"), logo ? "logo.png" : "foto.jpg");
-      datos.append("carpeta", logo ? "marca" : "candidatos");
+      datos.append("carpeta", logo ? "marca" : carpeta);
       const res = await fetch("/api/admin/imagenes", { method: "POST", body: datos });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "No se pudo subir la imagen.");
@@ -60,7 +71,7 @@ export function SubirFoto({ name, inicial, logo = false }: { name: string; inici
             <Loader2 className="size-6 animate-spin text-marca-500" aria-label="Subiendo" />
           ) : url ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={url} alt={logo ? "Logo" : "Foto del candidato"} className={`size-full ${logo ? "object-contain" : "object-cover"}`} />
+            <img src={url} alt={logo ? "Logo" : "Foto"} className={`size-full ${logo ? "object-contain" : "object-cover"}`} />
           ) : (
             <ImageUp className="size-7 text-slate-400" aria-hidden />
           )}

@@ -35,13 +35,15 @@ model ProcesoElectoral {
 }
 
 model Cargo {
-  id         String           @id @default(cuid())
-  procesoId  String
-  proceso    ProcesoElectoral @relation(fields: [procesoId], references: [id], onDelete: Cascade)
-  nombre     String // ej. Presidencia, Secretaría
-  orden      Int              @default(0)
-  candidatos Candidato[]
-  votos      Voto[]
+  id             String           @id @default(cuid())
+  procesoId      String
+  proceso        ProcesoElectoral @relation(fields: [procesoId], references: [id], onDelete: Cascade)
+  nombre         String // ej. Presidencia, Secretaría
+  orden          Int              @default(0)
+  // Cuántos candidatos marca cada votante; quedan elegidos los N más votados (ej. Asesores = 3).
+  maxSelecciones Int              @default(1)
+  candidatos     Candidato[]
+  votos          Voto[]
 }
 
 model Candidato {
@@ -62,6 +64,7 @@ model Votante {
   apellidos        String
   correo           String?
   celular          String?
+  fotoUrl          String? // en S3 (votantes/); solo visible con sesión del comité o del votante
 
   token         TokenAcceso?
   participacion RegistroParticipacion?

@@ -10,7 +10,7 @@ import { PanelLateral, piePanel } from "@/components/PanelLateral";
 import { Alerta, boton, campo, tarjeta } from "@/components/ui";
 
 type Candidato = { id: string; nombreCompleto: string; fotoUrl: string | null; propuestaResumen: string | null };
-type Cargo = { id: string; nombre: string; candidatos: Candidato[] };
+type Cargo = { id: string; nombre: string; maxSelecciones: number; candidatos: Candidato[] };
 
 type Dialogo =
   | { tipo: "cargo"; cargo?: Cargo }
@@ -89,6 +89,11 @@ export function GestionCandidatos({ cargos, hayVotos }: { cargos: Cargo[]; hayVo
                 <span className="ml-2 text-sm font-normal text-slate-500">
                   {cargo.candidatos.length} {cargo.candidatos.length === 1 ? "candidato" : "candidatos"}
                 </span>
+                {cargo.maxSelecciones > 1 && (
+                  <span className="ml-2 inline-flex rounded-full bg-acento-100 px-2.5 py-0.5 align-middle text-xs font-semibold text-acento-800">
+                    Se eligen {cargo.maxSelecciones}
+                  </span>
+                )}
               </h3>
               <div className="flex gap-1.5">
                 <button className={botonIcono} disabled={i === 0 || pendiente} onClick={() => ejecutar(() => moverCargo(cargo.id, -1))} aria-label="Subir cargo" title="Subir">
@@ -225,6 +230,23 @@ function FormCargo({ cargo, onCerrar, onListo }: { cargo?: Cargo; onCerrar: () =
         <label className="block text-sm font-semibold text-marca-900">
           Nombre del cargo
           <input name="nombre" required autoFocus defaultValue={cargo?.nombre} placeholder="Presidencia" className={`${campo} mt-1.5`} />
+        </label>
+        <label className="block text-sm font-semibold text-marca-900">
+          ¿Cuántas personas se eligen?
+          <input
+            name="maxSelecciones"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={10}
+            required
+            defaultValue={cargo?.maxSelecciones ?? 1}
+            className={`${campo} mt-1.5 sm:w-32`}
+          />
+          <span className="mt-1.5 block text-xs font-normal text-slate-500">
+            Con 1, el votante marca un solo candidato. Con más (por ejemplo 3 para Asesores), puede marcar hasta ese número y quedan
+            elegidos los más votados.
+          </span>
         </label>
         {estado && !estado.ok && <Alerta tipo="error">{estado.mensaje}</Alerta>}
         <div className={piePanel}>

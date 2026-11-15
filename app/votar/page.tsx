@@ -25,6 +25,7 @@ export default async function Votar() {
     select: {
       id: true,
       nombre: true,
+      maxSelecciones: true,
       candidatos: {
         orderBy: { nombreCompleto: "asc" },
         select: { id: true, nombreCompleto: true, fotoUrl: true, propuestaResumen: true },
@@ -45,7 +46,7 @@ export default async function Votar() {
           </form>
         }
       />
-      <Cedula votante={`${votante.nombres} ${votante.apellidos}`} codigo={votante.codigoEstudiante} cargos={cargos} />
+      <Cedula votante={`${votante.nombres} ${votante.apellidos}`} codigo={votante.codigoEstudiante} foto={votante.fotoUrl} cargos={cargos} />
     </>
   );
 }

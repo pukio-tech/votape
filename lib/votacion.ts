@@ -32,7 +32,7 @@ function mezclar<T>(lista: T[]): T[] {
  *  3. Inserta los votos SIN ningún vínculo con el votante.
  * Si cualquier paso falla, no se guarda nada.
  */
-export async function emitirVoto(votanteId: string, selecciones: Record<string, string>, ip: string) {
+export async function emitirVoto(votanteId: string, selecciones: Record<string, string[]>, ip: string) {
   const proceso = await obtenerProceso();
   if (!proceso || !estadoVotacion(proceso).abierta) {
     throw new VotoError("ELECCION_CERRADA", "La votación no está abierta en este momento.");
@@ -40,19 +40,25 @@ export async function emitirVoto(votanteId: string, selecciones: Record<string, 
 
   const cargos = await prisma.cargo.findMany({
     where: { procesoId: proceso.id },
-    select: { id: true, candidatos: { select: { id: true } } },
+    select: { id: true, nombre: true, maxSelecciones: true, candidatos: { select: { id: true } } },
   });
 
-  // La cédula debe traer exactamente un candidato válido por cada cargo.
+  // La cédula debe traer de 1 a `maxSelecciones` candidatos válidos y distintos por cada cargo.
   if (Object.keys(selecciones).length !== cargos.length) {
-    throw new VotoError("CEDULA_INVALIDA", "Debes elegir un candidato en cada cargo.");
+    throw new VotoError("CEDULA_INVALIDA", "Debes elegir al menos un candidato en cada cargo.");
   }
-  const votos = cargos.map((cargo) => {
-    const candidatoId = selecciones[cargo.id];
-    if (!candidatoId || !cargo.candidatos.some((c) => c.id === candidatoId)) {
+  const votos = cargos.flatMap((cargo) => {
+    const elegidos = selecciones[cargo.id] ?? [];
+    if (elegidos.length === 0 || new Set(elegidos).size !== elegidos.length) {
+      throw new VotoError("CEDULA_INVALIDA", `Revisa tu selección en ${cargo.nombre}.`);
+    }
+    if (elegidos.length > cargo.maxSelecciones) {
+      throw new VotoError("CEDULA_INVALIDA", `En ${cargo.nombre} puedes elegir como máximo ${cargo.maxSelecciones}.`);
+    }
+    if (!elegidos.every((id) => cargo.candidatos.some((c) => c.id === id))) {
       throw new VotoError("CEDULA_INVALIDA", "La cédula contiene una selección no válida.");
     }
-    return { cargoId: cargo.id, candidatoId };
+    return elegidos.map((candidatoId) => ({ cargoId: cargo.id, candidatoId }));
   });
 
   // La hora del voto se trunca a la hora en punto y el id es aleatorio (no un cuid,

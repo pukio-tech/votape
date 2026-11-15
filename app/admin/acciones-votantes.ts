@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { z } from "zod";
 import { obtenerAjustes } from "@/lib/ajustes";
+import { borrarImagenPorUrl, PREFIJO_IMAGENES } from "@/lib/almacenamiento";
 import { exigirAdmin } from "@/lib/autorizacion";
 import { asignarToken, parsearCsv, registrarPadron, validarPadron } from "@/lib/padron";
 import { obtenerIp } from "@/lib/peticion";
@@ -44,6 +45,7 @@ const esquemaVotante = z.object({
   celular: opcional(20)
     .transform((v) => normalizarCelular(v))
     .refine((v) => !v || celularValido(v), "El celular debe tener 9 dígitos (o el código de país y el número)."),
+  fotoUrl: opcional(200).refine((v) => !v || v.startsWith(`${PREFIJO_IMAGENES}votantes/`), "Foto no válida. Súbela de nuevo."),
 });
 
 export async function guardarVotante(_prev: RespuestaVotante, formData: FormData): Promise<RespuestaVotante> {
@@ -55,6 +57,7 @@ export async function guardarVotante(_prev: RespuestaVotante, formData: FormData
     apellidos: formData.get("apellidos"),
     correo: formData.get("correo") ?? "",
     celular: formData.get("celular") ?? "",
+    fotoUrl: formData.get("fotoUrl") ?? "",
   });
   if (!datos.success) return { ok: false, mensaje: datos.error.issues[0].message };
   const id = String(formData.get("id") ?? "");
@@ -63,7 +66,9 @@ export async function guardarVotante(_prev: RespuestaVotante, formData: FormData
   if (repetido && repetido.id !== id) return { ok: false, mensaje: "Ya existe un votante con ese código." };
 
   if (id) {
+    const anterior = await prisma.votante.findUnique({ where: { id }, select: { fotoUrl: true } });
     await prisma.votante.update({ where: { id }, data: datos.data });
+    if (anterior?.fotoUrl && anterior.fotoUrl !== datos.data.fotoUrl) await borrarImagenPorUrl(anterior.fotoUrl);
     await registrarLog("VOTANTE_EDITADO", `${admin.nombre} editó al votante ${datos.data.codigoEstudiante}.`, await obtenerIp());
     refrescar();
     return { ok: true, mensaje: "Votante actualizado." };
@@ -88,6 +93,7 @@ export async function eliminarVotante(id: string): Promise<RespuestaVotante> {
   if (votante.participacion) return { ok: false, mensaje: "No se puede eliminar a un votante que ya votó." };
 
   await prisma.votante.delete({ where: { id } });
+  await borrarImagenPorUrl(votante.fotoUrl);
   await registrarLog("VOTANTE_ELIMINADO", `${admin.nombre} eliminó al votante ${votante.codigoEstudiante}.`, await obtenerIp());
   refrescar();
   return { ok: true, mensaje: `Votante ${votante.codigoEstudiante} eliminado.` };

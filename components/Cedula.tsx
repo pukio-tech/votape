@@ -8,7 +8,7 @@ import { PanelLateral } from "./PanelLateral";
 import { Alerta, boton, tarjeta } from "./ui";
 
 type Candidato = { id: string; nombreCompleto: string; fotoUrl: string | null; propuestaResumen: string | null };
-type Cargo = { id: string; nombre: string; candidatos: Candidato[] };
+type Cargo = { id: string; nombre: string; maxSelecciones: number; candidatos: Candidato[] };
 
 type Fase =
   | { tipo: "eligiendo" }
@@ -17,13 +17,26 @@ type Fase =
   | { tipo: "error"; mensaje: string; fatal: boolean }
   | { tipo: "listo"; constancia: string; fecha: string };
 
-export function Cedula({ votante, codigo, cargos }: { votante: string; codigo: string; cargos: Cargo[] }) {
-  const [selecciones, setSelecciones] = useState<Record<string, string>>({});
+export function Cedula({
+  votante,
+  codigo,
+  foto,
+  cargos,
+}: {
+  votante: string;
+  codigo: string;
+  foto?: string | null;
+  cargos: Cargo[];
+}) {
+  // Por cargo, la lista de candidatos marcados (1 en la mayoría; hasta `maxSelecciones` en otros, ej. Asesores).
+  const [selecciones, setSelecciones] = useState<Record<string, string[]>>({});
   const [fase, setFase] = useState<Fase>({ tipo: "eligiendo" });
   const secciones = useRef<Record<string, HTMLElement | null>>({});
 
-  const completos = cargos.filter((c) => selecciones[c.id]).length;
+  const elegidos = (cargoId: string) => selecciones[cargoId] ?? [];
+  const completos = cargos.filter((c) => elegidos(c.id).length > 0).length;
   const todoListo = completos === cargos.length;
+  const hayMultiples = cargos.some((c) => c.maxSelecciones > 1);
 
   // Evita cerrar la pestaña por accidente con la cédula a medio llenar.
   useEffect(() => {
@@ -37,13 +50,20 @@ export function Cedula({ votante, codigo, cargos }: { votante: string; codigo: s
     secciones.current[cargoId]?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  function elegir(cargoId: string, candidatoId: string) {
-    const primeraVez = !selecciones[cargoId];
-    const nuevas = { ...selecciones, [cargoId]: candidatoId };
+  function elegir(cargo: Cargo, candidatoId: string) {
+    const actuales = elegidos(cargo.id);
+    if (cargo.maxSelecciones > 1) {
+      // Selección múltiple: marca o desmarca, sin pasar del límite.
+      const marcado = actuales.includes(candidatoId);
+      if (!marcado && actuales.length >= cargo.maxSelecciones) return;
+      setSelecciones({ ...selecciones, [cargo.id]: marcado ? actuales.filter((id) => id !== candidatoId) : [...actuales, candidatoId] });
+      return;
+    }
+    const nuevas = { ...selecciones, [cargo.id]: [candidatoId] };
     setSelecciones(nuevas);
     // Al completar un cargo por primera vez, lleva al siguiente pendiente.
-    const siguiente = cargos.find((c) => !nuevas[c.id]);
-    if (primeraVez && siguiente) setTimeout(() => irA(siguiente.id), 350);
+    const siguiente = cargos.find((c) => !nuevas[c.id]?.length);
+    if (actuales.length === 0 && siguiente) setTimeout(() => irA(siguiente.id), 350);
   }
 
   async function emitir() {
@@ -72,58 +92,88 @@ export function Cedula({ votante, codigo, cargos }: { votante: string; codigo: s
     <main className="flex-1 pb-32">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="mt-6 flex flex-col gap-4 rounded-2xl bg-marca-50/70 p-5 ring-1 ring-inset ring-marca-100 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm text-marca-700">Hola,</p>
-            <p className="text-lg font-bold text-marca-950">
-              {votante} <span className="text-sm font-medium text-slate-500">· {codigo}</span>
-            </p>
+          <div className="flex items-center gap-3">
+            {foto && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={foto} alt="" className="size-14 shrink-0 rounded-full object-cover ring-2 ring-white" />
+            )}
+            <div className="min-w-0">
+              <p className="text-sm text-marca-700">Hola,</p>
+              <p className="text-lg font-bold text-marca-950">
+                {votante} <span className="text-sm font-medium text-slate-500">· {codigo}</span>
+              </p>
+            </div>
           </div>
           <p className="flex items-start gap-2 text-sm text-marca-800 sm:max-w-sm">
             <ShieldCheck className="mt-0.5 size-[18px] shrink-0 text-marca-500" aria-hidden />
-            Elige un candidato por cargo. Podrás revisar tu cédula antes de emitir el voto. Tienes 20 minutos.
+            Elige un candidato por cargo{hayMultiples ? " (donde se indica, puedes marcar más de uno)" : ""}. Podrás revisar tu cédula antes de
+            emitir el voto. Tienes 20 minutos.
           </p>
         </div>
 
-        {cargos.map((cargo, i) => (
-          <section
-            key={cargo.id}
-            ref={(el) => {
-              secciones.current[cargo.id] = el;
-            }}
-            className="scroll-mt-20 pt-10"
-            aria-labelledby={`cargo-${cargo.id}`}
-          >
-            <div className="mb-4 flex items-end justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-acento-700">
-                  Cargo {i + 1} de {cargos.length}
-                </p>
-                <h2 id={`cargo-${cargo.id}`} className="mt-1 text-xl font-bold tracking-tight text-marca-950">
-                  {cargo.nombre}
-                </h2>
+        {cargos.map((cargo, i) => {
+          const marcados = elegidos(cargo.id);
+          const multiple = cargo.maxSelecciones > 1;
+          const lleno = multiple && marcados.length >= cargo.maxSelecciones;
+          return (
+            <section
+              key={cargo.id}
+              ref={(el) => {
+                secciones.current[cargo.id] = el;
+              }}
+              className="scroll-mt-20 pt-10"
+              aria-labelledby={`cargo-${cargo.id}`}
+            >
+              <div className="mb-4 flex items-end justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-acento-700">
+                    Cargo {i + 1} de {cargos.length}
+                  </p>
+                  <h2 id={`cargo-${cargo.id}`} className="mt-1 text-xl font-bold tracking-tight text-marca-950">
+                    {cargo.nombre}
+                  </h2>
+                  {multiple && (
+                    <p className="mt-1 text-sm text-slate-600">
+                      Marca hasta <strong>{cargo.maxSelecciones}</strong>. Quedan elegidos los {cargo.maxSelecciones} más votados.
+                    </p>
+                  )}
+                </div>
+                {multiple ? (
+                  <span className={`shrink-0 text-sm font-semibold ${marcados.length ? "text-emerald-700" : "text-slate-400"}`}>
+                    {marcados.length} de {cargo.maxSelecciones}
+                  </span>
+                ) : marcados.length ? (
+                  <span className="flex shrink-0 items-center gap-1 text-sm font-semibold text-emerald-700">
+                    <CheckCircle2 className="size-4" aria-hidden /> Elegido
+                  </span>
+                ) : (
+                  <span className="shrink-0 text-sm text-slate-400">Pendiente</span>
+                )}
               </div>
-              {selecciones[cargo.id] ? (
-                <span className="flex items-center gap-1 text-sm font-semibold text-emerald-700">
-                  <CheckCircle2 className="size-4" aria-hidden /> Elegido
-                </span>
-              ) : (
-                <span className="text-sm text-slate-400">Pendiente</span>
-              )}
-            </div>
-            <div role="radiogroup" aria-labelledby={`cargo-${cargo.id}`} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {cargo.candidatos.map((c) => (
-                <TarjetaCandidato
-                  key={c.id}
-                  candidato={c}
-                  nombreGrupo={cargo.id}
-                  seleccionado={selecciones[cargo.id] === c.id}
-                  hayOtroSeleccionado={Boolean(selecciones[cargo.id]) && selecciones[cargo.id] !== c.id}
-                  onSeleccionar={() => elegir(cargo.id, c.id)}
-                />
-              ))}
-            </div>
-          </section>
-        ))}
+              <div
+                role={multiple ? "group" : "radiogroup"}
+                aria-labelledby={`cargo-${cargo.id}`}
+                className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+              >
+                {cargo.candidatos.map((c) => {
+                  const seleccionado = marcados.includes(c.id);
+                  return (
+                    <TarjetaCandidato
+                      key={c.id}
+                      candidato={c}
+                      nombreGrupo={cargo.id}
+                      multiple={multiple}
+                      seleccionado={seleccionado}
+                      atenuado={!seleccionado && marcados.length > 0 && (!multiple || lleno)}
+                      bloqueado={!seleccionado && lleno}
+                      onSeleccionar={() => elegir(cargo, c.id)}
+                    />
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
       </div>
 
       {/* Barra inferior con el progreso */}
@@ -135,14 +185,14 @@ export function Cedula({ votante, codigo, cargos }: { votante: string; codigo: s
             </p>
             <div className="mt-2 flex gap-1">
               {cargos.map((c) => (
-                <span key={c.id} className={`h-1.5 flex-1 rounded-full transition-colors ${selecciones[c.id] ? "bg-acento-400" : "bg-slate-200"}`} />
+                <span key={c.id} className={`h-1.5 flex-1 rounded-full transition-colors ${elegidos(c.id).length ? "bg-acento-400" : "bg-slate-200"}`} />
               ))}
             </div>
           </div>
           <button
             type="button"
             onClick={() => {
-              const pendiente = cargos.find((c) => !selecciones[c.id]);
+              const pendiente = cargos.find((c) => !elegidos(c.id).length);
               if (pendiente) irA(pendiente.id);
               else setFase({ tipo: "confirmando" });
             }}
@@ -170,31 +220,40 @@ export function Cedula({ votante, codigo, cargos }: { votante: string; codigo: s
 function TarjetaCandidato({
   candidato,
   nombreGrupo,
+  multiple,
   seleccionado,
-  hayOtroSeleccionado,
+  atenuado,
+  bloqueado,
   onSeleccionar,
 }: {
   candidato: Candidato;
   nombreGrupo: string;
+  /** Cargo con varios elegidos: la tarjeta funciona como casilla de verificación. */
+  multiple: boolean;
   seleccionado: boolean;
-  hayOtroSeleccionado: boolean;
+  atenuado: boolean;
+  /** Ya se marcó el máximo permitido en el cargo. */
+  bloqueado: boolean;
   onSeleccionar: () => void;
 }) {
   const [expandido, setExpandido] = useState(false);
   return (
     <label
-      className={`group relative flex cursor-pointer gap-4 rounded-2xl bg-white p-4 shadow-sm ring-1 transition duration-200 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-marca-200 sm:flex-col sm:p-5 ${
+      className={`group relative flex gap-4 rounded-2xl bg-white p-4 shadow-sm ring-1 transition duration-200 has-[:focus-visible]:ring-4 has-[:focus-visible]:ring-marca-200 sm:flex-col sm:p-5 ${
         seleccionado
-          ? "ring-2 ring-marca-700 shadow-md shadow-marca-900/10"
-          : `ring-slate-200 hover:-translate-y-0.5 hover:shadow-md hover:ring-marca-200 ${hayOtroSeleccionado ? "opacity-70 hover:opacity-100" : ""}`
+          ? "cursor-pointer ring-2 ring-marca-700 shadow-md shadow-marca-900/10"
+          : bloqueado
+            ? "cursor-not-allowed opacity-50 ring-slate-200"
+            : `cursor-pointer ring-slate-200 hover:-translate-y-0.5 hover:shadow-md hover:ring-marca-200 ${atenuado ? "opacity-70 hover:opacity-100" : ""}`
       }`}
     >
       <input
-        type="radio"
+        type={multiple ? "checkbox" : "radio"}
         name={nombreGrupo}
         value={candidato.id}
         aria-label={candidato.nombreCompleto}
         checked={seleccionado}
+        disabled={bloqueado}
         onChange={onSeleccionar}
         className="sr-only"
       />
@@ -264,7 +323,7 @@ function Confirmacion({
   onConfirmar,
 }: {
   cargos: Cargo[];
-  selecciones: Record<string, string>;
+  selecciones: Record<string, string[]>;
   fase: Fase;
   onCancelar: () => void;
   onConfirmar: () => void;
@@ -297,14 +356,21 @@ function Confirmacion({
     >
       <ul className="space-y-2.5">
         {cargos.map((cargo) => {
-          const c = cargo.candidatos.find((x) => x.id === selecciones[cargo.id]);
+          const marcados = cargo.candidatos.filter((x) => selecciones[cargo.id]?.includes(x.id));
           return (
-            <li key={cargo.id} className="flex items-center gap-3.5 rounded-2xl bg-slate-50 p-3 ring-1 ring-inset ring-slate-200/70">
-              {c && <Foto url={c.fotoUrl} nombre={c.nombreCompleto} className="size-14 text-base" />}
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wider text-acento-700">{cargo.nombre}</p>
-                <p className="font-bold text-marca-950">{c?.nombreCompleto}</p>
-              </div>
+            <li key={cargo.id} className="rounded-2xl bg-slate-50 p-3 ring-1 ring-inset ring-slate-200/70">
+              <p className="text-xs font-semibold uppercase tracking-wider text-acento-700">
+                {cargo.nombre}
+                {cargo.maxSelecciones > 1 && ` · ${marcados.length} de ${cargo.maxSelecciones}`}
+              </p>
+              <ul className="mt-2 space-y-2">
+                {marcados.map((c) => (
+                  <li key={c.id} className="flex items-center gap-3">
+                    <Foto url={c.fotoUrl} nombre={c.nombreCompleto} className="size-12 text-base" />
+                    <p className="min-w-0 font-bold text-marca-950">{c.nombreCompleto}</p>
+                  </li>
+                ))}
+              </ul>
             </li>
           );
         })}
@@ -360,7 +426,7 @@ function Constancia({ constancia, fecha }: { constancia: string; fecha: string }
           </p>
           <div className="mt-5 grid gap-2 print:hidden">
             <Link href="/resultados" className={boton.primario}>
-              <BarChart3 className="size-4" aria-hidden /> Ver resultados en vivo
+              <BarChart3 className="size-4" aria-hidden /> Ver resultados
             </Link>
             <Link href="/" className={boton.fantasma}>
               Finalizar

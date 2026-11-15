@@ -35,6 +35,7 @@ import {
 import { PanelLateral, piePanel } from "@/components/PanelLateral";
 import { Alerta, Insignia, boton, campo, tarjeta } from "@/components/ui";
 import { EditorPlantilla } from "@/components/admin/EditorPlantilla";
+import { SubirFoto } from "@/components/admin/SubirFoto";
 import { formatearFecha } from "@/lib/fechas";
 
 type Votante = {
@@ -45,6 +46,7 @@ type Votante = {
   apellidos: string;
   correo: string | null;
   celular: string | null;
+  fotoUrl: string | null;
   estado: "PENDIENTE" | "USADO" | "ANULADO" | null;
   tieneCopia: boolean;
   fechaUso: string | null;
@@ -287,8 +289,9 @@ export function GestionVotantes({
           {votantes.length === 0 && <li className="px-4 py-12 text-center text-sm text-slate-500">{vacio}</li>}
           {votantes.map((v) => (
             <li key={v.id} className="px-4 py-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+              <div className="flex items-start gap-3">
+                <AvatarVotante votante={v} className="size-12" />
+                <div className="min-w-0 flex-1">
                   <p className="font-semibold leading-snug text-marca-950">
                     {v.apellidos}, {v.nombres}
                   </p>
@@ -337,10 +340,15 @@ export function GestionVotantes({
                   <td className="whitespace-nowrap px-4 py-3 font-mono text-marca-900">{v.codigoEstudiante}</td>
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-600">{v.dni ?? "—"}</td>
                   <td className="px-4 py-3">
-                    <p className="font-medium text-marca-950">
-                      {v.apellidos}, {v.nombres}
-                    </p>
-                    {v.celular && <p className="text-xs tabular-nums text-slate-500">Cel. {v.celular}</p>}
+                    <div className="flex items-center gap-3">
+                      <AvatarVotante votante={v} className="size-9 text-xs" />
+                      <div className="min-w-0">
+                        <p className="font-medium text-marca-950">
+                          {v.apellidos}, {v.nombres}
+                        </p>
+                        {v.celular && <p className="text-xs tabular-nums text-slate-500">Cel. {v.celular}</p>}
+                      </div>
+                    </div>
                   </td>
                   <td className="hidden max-w-48 truncate px-4 py-3 text-slate-600 lg:table-cell">{v.correo ?? "—"}</td>
                   <td className="whitespace-nowrap px-4 py-3" title={v.fechaUso ? `Votó el ${formatearFecha(v.fechaUso)}` : undefined}>
@@ -448,6 +456,12 @@ function FormVotante({
     >
       <form action={accion} className="space-y-4">
         {votante && <input type="hidden" name="id" value={votante.id} />}
+        <div>
+          <p className="mb-1.5 text-sm font-semibold text-marca-900">
+            Foto <span className="font-normal text-slate-400">(opcional)</span>
+          </p>
+          <SubirFoto name="fotoUrl" inicial={votante?.fotoUrl} carpeta="votantes" />
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm font-semibold text-marca-900">
             Código de estudiante
@@ -607,5 +621,19 @@ function FormImportar({ onCerrar, onListo }: { onCerrar: () => void; onListo: ()
         </form>
       )}
     </PanelLateral>
+  );
+}
+
+/** Foto del votante o sus iniciales. */
+function AvatarVotante({ votante, className = "" }: { votante: Pick<Votante, "fotoUrl" | "nombres" | "apellidos">; className?: string }) {
+  if (votante.fotoUrl) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={votante.fotoUrl} alt="" className={`shrink-0 rounded-full object-cover ring-1 ring-slate-200 ${className}`} />;
+  }
+  const iniciales = `${votante.nombres[0] ?? ""}${votante.apellidos[0] ?? ""}`.toUpperCase();
+  return (
+    <span className={`grid shrink-0 place-items-center rounded-full bg-marca-100 font-bold text-marca-700 ${className}`} aria-hidden>
+      {iniciales}
+    </span>
   );
 }

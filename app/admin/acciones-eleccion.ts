@@ -76,18 +76,35 @@ export async function guardarCargo(_prev: Respuesta, formData: FormData): Promis
   const proceso = await procesoActual();
   const nombre = nombreCargo.safeParse(formData.get("nombre"));
   if (!nombre.success) return { ok: false, mensaje: nombre.error.issues[0].message };
+  const max = z.coerce
+    .number()
+    .int("Indica un número entero.")
+    .min(1, "Se elige al menos 1 persona.")
+    .max(10, "Máximo 10 personas por cargo.")
+    .safeParse(formData.get("maxSelecciones") ?? 1);
+  if (!max.success) return { ok: false, mensaje: max.error.issues[0].message };
+  const maxSelecciones = max.data;
   const id = String(formData.get("id") ?? "");
 
   if (id) {
     const cargo = await prisma.cargo.findFirst({ where: { id, procesoId: proceso.id } });
     if (!cargo) return { ok: false, mensaje: "El cargo no existe." };
-    await prisma.cargo.update({ where: { id }, data: { nombre: nombre.data } });
-    await registrarLog("CARGO_EDITADO", `${admin.nombre} renombró el cargo "${cargo.nombre}" a "${nombre.data}".`, await obtenerIp(), proceso.id);
+    // Con votos emitidos no se puede cambiar cuántos se eligen (cambiaría las reglas a mitad de la votación).
+    if (cargo.maxSelecciones !== maxSelecciones && (await hayVotos(proceso.id))) return { ok: false, mensaje: AVISO_CON_VOTOS };
+    await prisma.cargo.update({ where: { id }, data: { nombre: nombre.data, maxSelecciones } });
+    await registrarLog(
+      "CARGO_EDITADO",
+      `${admin.nombre} editó el cargo "${nombre.data}" (se eligen ${maxSelecciones}).`,
+      await obtenerIp(),
+      proceso.id,
+    );
   } else {
     if (await hayVotos(proceso.id)) return { ok: false, mensaje: AVISO_CON_VOTOS };
     const ultimo = await prisma.cargo.aggregate({ where: { procesoId: proceso.id }, _max: { orden: true } });
-    await prisma.cargo.create({ data: { procesoId: proceso.id, nombre: nombre.data, orden: (ultimo._max.orden ?? -1) + 1 } });
-    await registrarLog("CARGO_CREADO", `${admin.nombre} creó el cargo "${nombre.data}".`, await obtenerIp(), proceso.id);
+    await prisma.cargo.create({
+      data: { procesoId: proceso.id, nombre: nombre.data, maxSelecciones, orden: (ultimo._max.orden ?? -1) + 1 },
+    });
+    await registrarLog("CARGO_CREADO", `${admin.nombre} creó el cargo "${nombre.data}" (se eligen ${maxSelecciones}).`, await obtenerIp(), proceso.id);
   }
   refrescar();
   return { ok: true, mensaje: id ? "Cargo actualizado." : `Cargo "${nombre.data}" creado.` };

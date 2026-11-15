@@ -4,8 +4,13 @@ import { obtenerIp } from "@/lib/peticion";
 import { cerrarSesionVotante, obtenerVotanteSesion } from "@/lib/sesion";
 import { emitirVoto, VotoError } from "@/lib/votacion";
 
+// Por cada cargo, uno o varios candidatos (los cargos con maxSelecciones > 1 envían una lista).
+const idCandidato = z.string().max(40);
 const esquema = z.object({
-  selecciones: z.record(z.string().max(40), z.string().max(40)),
+  selecciones: z.record(
+    z.string().max(40),
+    z.union([idCandidato, z.array(idCandidato).max(20)]).transform((v) => (Array.isArray(v) ? v : [v])),
+  ),
 });
 
 const ESTADO_HTTP = { ELECCION_CERRADA: 403, CEDULA_INVALIDA: 400, TOKEN_NO_DISPONIBLE: 409 } as const;

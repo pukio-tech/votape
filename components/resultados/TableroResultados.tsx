@@ -1,8 +1,8 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Crown, Landmark, WifiOff } from "lucide-react";
+import { ChevronLeft, ChevronRight, Crown, Landmark, Lock, WifiOff } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { formatearActualizado } from "@/lib/fechas";
+import { formatearActualizado, formatearFecha } from "@/lib/fechas";
 import type { Resultados } from "@/lib/resultados";
 
 const ALTO_GRAFICO = 300; // px del área de barras
@@ -87,8 +87,22 @@ export function TableroResultados({ inicial, intervaloMs = 10_000 }: { inicial: 
         </div>
       </section>
 
+      {!datos.publicados && (
+        <section className="rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200/80 sm:p-10" aria-live="polite">
+          <div className="mx-auto grid size-14 place-items-center rounded-2xl bg-acento-100 text-acento-800">
+            <Lock className="size-7" aria-hidden />
+          </div>
+          <h3 className="mt-4 text-lg font-bold text-marca-950">Los resultados se publicarán al cierre de la votación</h3>
+          <p className="mx-auto mt-2 max-w-md text-sm text-slate-600">
+            Para no influir en quienes aún no votan, el conteo se muestra cuando termina la jornada
+            {datos.proceso.estado === "FINALIZADO" ? "" : ` (cierre: ${formatearFecha(datos.proceso.fechaCierre)})`}. Esta página se
+            actualizará sola.
+          </p>
+        </section>
+      )}
+
       {/* Filtro por cargo */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className={`flex flex-col gap-3 sm:flex-row sm:items-center ${datos.publicados ? "" : "hidden"}`}>
         <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-marca-900">
           <Landmark className="size-5 text-marca-600" aria-hidden /> Cargo
         </span>
@@ -123,8 +137,12 @@ function GraficoCargo({ cargo }: { cargo: Cargo }) {
   const desplazable = useRef<HTMLDivElement>(null);
   const { tope, paso } = escala(Math.max(...cargo.candidatos.map((c) => c.votos), 0));
   const marcas = Array.from({ length: tope / paso + 1 }, (_, i) => i * paso);
-  const lider = cargo.candidatos[0];
-  const hayLider = lider && lider.votos > 0 && cargo.candidatos[1]?.votos !== lider.votos;
+  // Quedan elegidos los N más votados (N = maxSelecciones; 1 en la mayoría de cargos). Si hay empate justo
+  // en el último puesto, nadie del empate se marca como elegido y se muestra el aviso.
+  const n = cargo.maxSelecciones;
+  const umbral = cargo.candidatos[n]?.votos ?? -1;
+  const elegido = (i: number) => i < n && cargo.candidatos[i].votos > 0 && cargo.candidatos[i].votos > umbral;
+  const empateEnCorte = (cargo.candidatos[n - 1]?.votos ?? 0) > 0 && cargo.candidatos[n - 1]?.votos === cargo.candidatos[n]?.votos;
 
   const mover = (dir: 1 | -1) => desplazable.current?.scrollBy({ left: dir * ANCHO_COLUMNA * 2, behavior: "smooth" });
 
@@ -133,11 +151,26 @@ function GraficoCargo({ cargo }: { cargo: Cargo }) {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 id="titulo-grafico" className="text-lg font-bold text-marca-950">
           {cargo.nombre}
+          {n > 1 && (
+            <span className="ml-2 inline-flex rounded-full bg-acento-100 px-2.5 py-0.5 align-middle text-xs font-semibold text-acento-800">
+              Se eligen {n}
+            </span>
+          )}
         </h3>
         <p className="text-sm text-slate-500">
           {num(cargo.total)} {cargo.total === 1 ? "voto válido" : "votos válidos"}
         </p>
       </div>
+      {n > 1 && (
+        <p className="mt-1 text-xs text-slate-500">
+          Cada votante marca hasta {n}; los porcentajes se calculan sobre el total de marcas del cargo.
+        </p>
+      )}
+      {empateEnCorte && (
+        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 ring-1 ring-inset ring-amber-200">
+          {n === 1 ? "Empate en el primer lugar." : `Empate en el puesto ${n}: el último lugar elegido aún no está definido.`}
+        </p>
+      )}
 
       <div className="relative mt-2 flex">
         {/* Eje Y */}
@@ -168,13 +201,13 @@ function GraficoCargo({ cargo }: { cargo: Cargo }) {
                 ))}
                 <ul className="relative flex h-full items-end">
                   {cargo.candidatos.map((c, i) => {
-                    const destacado = hayLider && i === 0;
+                    const destacado = elegido(i);
                     return (
                       <li key={c.id} className="flex h-full flex-1 flex-col items-center justify-end px-1.5 sm:px-4" title={`${c.nombreCompleto}: ${num(c.votos)} votos`}>
                         <div className="mb-2 flex flex-col items-center">
                           <Foto url={c.fotoUrl} nombre={c.nombreCompleto} destacado={destacado} />
                           <span className={`mt-1.5 flex items-center gap-1 whitespace-nowrap text-[13px] font-bold tabular-nums sm:text-lg text-marca-700`}>
-                            {destacado && <Crown className="size-3.5 sm:size-4" aria-label="Lidera" />}
+                            {destacado && <Crown className="size-3.5 sm:size-4" aria-label={n > 1 ? "Elegido" : "Lidera"} />}
                             {pct(c.porcentaje)}
                           </span>
                         </div>
@@ -238,7 +271,14 @@ function GraficoCargo({ cargo }: { cargo: Cargo }) {
             {cargo.candidatos.map((c, i) => (
               <tr key={c.id} className="border-b border-slate-100 last:border-0">
                 <td className="hidden py-2.5 pr-3 tabular-nums text-slate-400 sm:table-cell">{i + 1}</td>
-                <td className="py-2.5 pr-3 font-medium text-marca-950">{c.nombreCompleto}</td>
+                <td className="py-2.5 pr-3 font-medium text-marca-950">
+                  {c.nombreCompleto}
+                  {n > 1 && elegido(i) && (
+                    <span className="ml-2 inline-flex rounded-full bg-marca-50 px-2 py-0.5 align-middle text-[11px] font-semibold text-marca-700 ring-1 ring-inset ring-marca-200">
+                      Elegido
+                    </span>
+                  )}
+                </td>
                 <td className="py-2.5 pr-3 text-right tabular-nums text-slate-700">{num(c.votos)}</td>
                 <td className="py-2.5 text-right font-semibold tabular-nums text-marca-800">{pct(c.porcentaje)}</td>
               </tr>

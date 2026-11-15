@@ -23,7 +23,7 @@ type Rol = "ADMIN" | "OBSERVADOR";
 
 const ROLES: Record<Rol, { nombre: string; descripcion: string; Icono: typeof Eye }> = {
   ADMIN: { nombre: "Administrador", descripcion: "Acceso total: jornada, actividad, usuarios y resultados.", Icono: UserCog },
-  OBSERVADOR: { nombre: "Observador", descripcion: "Solo ve el tablero de resultados en vivo.", Icono: Eye },
+  OBSERVADOR: { nombre: "Observador", descripcion: "Solo ve el tablero de resultados.", Icono: Eye },
 };
 
 const AYUDA_PASSWORD = "Mínimo 8 caracteres, con letras y al menos un número.";

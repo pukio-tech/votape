@@ -7,7 +7,7 @@ import { TableroResultados } from "@/components/resultados/TableroResultados";
 import { Alerta } from "@/components/ui";
 import { calcularResultados } from "@/lib/resultados";
 
-export const metadata: Metadata = { title: "Resultados en vivo" };
+export const metadata: Metadata = { title: "Resultados" };
 
 export default async function ResultadosPublicos() {
   await connection();
@@ -16,7 +16,7 @@ export default async function ResultadosPublicos() {
   return (
     <>
       <Encabezado
-        titulo="Resultados en vivo"
+        titulo="Resultados"
         subtitulo={resultados?.proceso.institucion}
         accion={
           <Link
@@ -31,12 +31,12 @@ export default async function ResultadosPublicos() {
         {resultados ? (
           <>
             <div className="mb-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-acento-700">Conteo oficial en tiempo real</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-acento-700">Resultados oficiales</p>
               <h2 className="mt-1 text-2xl font-bold tracking-tight text-marca-950 sm:text-3xl">{resultados.proceso.titulo}</h2>
             </div>
             <TableroResultados inicial={resultados} />
             <p className="mt-6 text-center text-xs text-slate-500">
-              Resultados de la votación electrónica. Se actualizan automáticamente cada 10 segundos.
+              Resultados de la votación electrónica. Se publican al cierre de la votación.
             </p>
           </>
         ) : (

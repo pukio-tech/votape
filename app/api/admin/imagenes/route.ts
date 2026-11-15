@@ -18,7 +18,8 @@ export async function POST(request: NextRequest) {
 
   const formulario = await request.formData().catch(() => null);
   const archivo = formulario?.get("archivo");
-  const carpeta = formulario?.get("carpeta") === "marca" ? "marca" : "candidatos";
+  const pedida = formulario?.get("carpeta");
+  const carpeta = pedida === "marca" || pedida === "votantes" ? pedida : "candidatos";
   if (!(archivo instanceof File)) return NextResponse.json({ error: "Adjunta una imagen." }, { status: 400 });
   const extension = TIPOS_IMAGEN[archivo.type];
   if (!extension) return NextResponse.json({ error: "Usa una imagen JPG, PNG o WEBP." }, { status: 400 });

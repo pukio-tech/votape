@@ -37,7 +37,7 @@ export default async function Inicio() {
         href="/resultados"
         className="mt-6 flex items-center justify-center gap-2 border-t border-slate-200 pt-5 text-sm font-semibold text-marca-600 hover:text-marca-800"
       >
-        <BarChart3 className="size-4" aria-hidden /> Ver resultados en vivo
+        <BarChart3 className="size-4" aria-hidden /> Ver resultados
       </Link>
     </PantallaAcceso>
   );
