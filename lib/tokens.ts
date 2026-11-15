@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomInt } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomInt } from "node:crypto";
 
 // Sin caracteres ambiguos (0/O, 1/I/L) para facilitar el dictado y la lectura.
 const ALFABETO = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -38,4 +38,26 @@ export function generarConstancia(): string {
 
 export function sha256(valor: string): string {
   return createHash("sha256").update(valor).digest("hex");
+}
+
+// ---------- Copia cifrada para mostrar el token en el panel ----------
+
+/** Clave AES-256 derivada de TOKEN_PEPPER (distinta del uso para el hash). */
+function claveCifrado(): Buffer {
+  return createHash("sha256").update(`cifrado-token:${pepper()}`).digest();
+}
+
+/** Cifra el token con AES-256-GCM. Formato: iv.tag.datos (base64url). */
+export function cifrarToken(token: string): string {
+  const iv = randomBytes(12);
+  const cifrador = createCipheriv("aes-256-gcm", claveCifrado(), iv);
+  const datos = Buffer.concat([cifrador.update(token, "utf8"), cifrador.final()]);
+  return [iv, cifrador.getAuthTag(), datos].map((b) => b.toString("base64url")).join(".");
+}
+
+export function descifrarToken(cifrado: string): string {
+  const [iv, tag, datos] = cifrado.split(".").map((p) => Buffer.from(p, "base64url"));
+  const descifrador = createDecipheriv("aes-256-gcm", claveCifrado(), iv);
+  descifrador.setAuthTag(tag);
+  return Buffer.concat([descifrador.update(datos), descifrador.final()]).toString("utf8");
 }

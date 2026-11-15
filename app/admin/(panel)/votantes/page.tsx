@@ -47,6 +47,7 @@ export default async function Votantes({
         apellidos: true,
         correo: true,
         token: { select: { estado: true, fechaUso: true } },
+        entrega: { select: { id: true } },
       },
     }),
     prisma.tokenAcceso.groupBy({ by: ["estado"], _count: { _all: true } }),
@@ -59,6 +60,7 @@ export default async function Votantes({
       votantes={votantes.map((v) => ({
         ...v,
         estado: v.token?.estado ?? null,
+        tieneCopia: Boolean(v.entrega),
         fechaUso: v.token?.fechaUso?.toISOString() ?? null,
       }))}
       filtros={{ q, estado, pagina }}

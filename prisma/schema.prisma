@@ -20,50 +20,51 @@ enum EstadoToken {
 }
 
 model ProcesoElectoral {
-  id              String         @id @default(cuid())
-  titulo          String         // ej. Elecciones Consejo Estudiantil 2026
-  institucion     String?        // ej. UNSM
-  estado          EstadoEleccion @default(CONFIGURACION)
-  fechaInicio     DateTime
-  fechaCierre     DateTime
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  id          String         @id @default(cuid())
+  titulo      String // ej. Elecciones Consejo Estudiantil 2026
+  institucion String? // ej. UNSM
+  estado      EstadoEleccion @default(CONFIGURACION)
+  fechaInicio DateTime
+  fechaCierre DateTime
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
-  cargos          Cargo[]
-  votos           Voto[]
-  logs            AuditoriaLog[]
+  cargos Cargo[]
+  votos  Voto[]
+  logs   AuditoriaLog[]
 }
 
 model Cargo {
-  id          String      @id @default(cuid())
-  procesoId   String
-  proceso     ProcesoElectoral @relation(fields: [procesoId], references: [id], onDelete: Cascade)
-  nombre      String      // ej. Presidencia, Secretaría
-  orden       Int         @default(0)
-  candidatos  Candidato[]
-  votos       Voto[]
+  id         String           @id @default(cuid())
+  procesoId  String
+  proceso    ProcesoElectoral @relation(fields: [procesoId], references: [id], onDelete: Cascade)
+  nombre     String // ej. Presidencia, Secretaría
+  orden      Int              @default(0)
+  candidatos Candidato[]
+  votos      Voto[]
 }
 
 model Candidato {
-  id               String   @id @default(cuid())
+  id               String  @id @default(cuid())
   cargoId          String
-  cargo            Cargo    @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+  cargo            Cargo   @relation(fields: [cargoId], references: [id], onDelete: Cascade)
   nombreCompleto   String
   fotoUrl          String?
-  propuestaResumen String?  @db.Text
+  propuestaResumen String? @db.Text
   votos            Voto[]
 }
 
 model Votante {
-  id               String   @id @default(cuid())
-  codigoEstudiante String   @unique
+  id               String  @id @default(cuid())
+  codigoEstudiante String  @unique
   dni              String?
   nombres          String
   apellidos        String
   correo           String?
 
-  token            TokenAcceso?
-  participacion    RegistroParticipacion?
+  token         TokenAcceso?
+  participacion RegistroParticipacion?
+  entrega       TokenEntrega?
 
   @@index([codigoEstudiante])
 }
@@ -111,18 +112,28 @@ model AuditoriaLog {
 }
 
 enum RolUsuario {
-  ADMIN       // acceso total al panel
-  OBSERVADOR  // solo ve el tablero de resultados
+  ADMIN // acceso total al panel
+  OBSERVADOR // solo ve el tablero de resultados
 }
 
 model UsuarioAdmin {
-  id            String     @id @default(cuid())
-  nombre        String
-  correo        String     @unique
-  passwordHash  String
-  rol           RolUsuario @default(OBSERVADOR)
-  activo        Boolean    @default(true)
-  ultimoAcceso  DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id           String     @id @default(cuid())
+  nombre       String
+  correo       String     @unique
+  passwordHash String
+  rol          RolUsuario @default(OBSERVADOR)
+  activo       Boolean    @default(true)
+  ultimoAcceso DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+// Copia cifrada (AES-256-GCM) del token para que el comité pueda consultarlo y entregarlo
+// desde el panel. El acceso se sigue validando contra TokenAcceso.tokenHash.
+model TokenEntrega {
+  id        String   @id @default(cuid())
+  votanteId String   @unique
+  votante   Votante  @relation(fields: [votanteId], references: [id], onDelete: Cascade)
+  cifrado   String
+  updatedAt DateTime @updatedAt
 }

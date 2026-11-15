@@ -3,11 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { exigirAdmin } from "@/lib/autorizacion";
-import { parsearCsv, registrarPadron, validarPadron } from "@/lib/padron";
+import { asignarToken, parsearCsv, registrarPadron, validarPadron } from "@/lib/padron";
 import { obtenerIp } from "@/lib/peticion";
 import { prisma } from "@/lib/prisma";
 import { registrarLog } from "@/lib/proceso";
-import { generarToken, hashToken } from "@/lib/tokens";
+import { descifrarToken, generarToken } from "@/lib/tokens";
 
 /** Respuesta de las acciones de votantes. `token` solo viaja una vez, al generarlo. */
 export type RespuestaVotante = {
@@ -61,7 +61,8 @@ export async function guardarVotante(_prev: RespuestaVotante, formData: FormData
   }
 
   const token = generarToken();
-  await prisma.votante.create({ data: { ...datos.data, token: { create: { tokenHash: hashToken(token) } } } });
+  const creado = await prisma.votante.create({ data: datos.data });
+  await asignarToken(creado.id, token);
   await registrarLog("VOTANTE_CREADO", `${admin.nombre} registró al votante ${datos.data.codigoEstudiante}.`, await obtenerIp());
   refrescar();
   return {
@@ -91,11 +92,7 @@ export async function regenerarToken(id: string): Promise<RespuestaVotante> {
   if (votante.token?.estado === "USADO") return { ok: false, mensaje: "Este votante ya votó; su token no se puede regenerar." };
 
   const token = generarToken();
-  await prisma.tokenAcceso.upsert({
-    where: { votanteId: id },
-    create: { votanteId: id, tokenHash: hashToken(token) },
-    update: { tokenHash: hashToken(token), estado: "PENDIENTE", fechaGeneracion: new Date() },
-  });
+  await asignarToken(id, token);
   await registrarLog("TOKEN_REGENERADO", `${admin.nombre} generó un token nuevo para ${votante.codigoEstudiante}.`, await obtenerIp());
   refrescar();
   return {
@@ -138,5 +135,44 @@ export async function importarVotantes(_prev: RespuestaVotante, formData: FormDa
     ok: true,
     mensaje: `${padron.length} votantes procesados · ${tokens.length} tokens nuevos.`,
     tokens,
+  };
+}
+
+/** Muestra el token vigente de un votante. Queda registrado en la auditoría. */
+export async function verToken(id: string): Promise<RespuestaVotante> {
+  const admin = await exigirAdmin();
+  const votante = await prisma.votante.findUnique({ where: { id }, include: { token: true, entrega: true } });
+  if (!votante?.token) return { ok: false, mensaje: "Este votante no tiene token. Genera uno." };
+  if (!votante.entrega) return { ok: false, mensaje: "Este token se creó antes de guardar copias. Genera uno nuevo para verlo." };
+
+  await registrarLog("TOKEN_VISTO", `${admin.nombre} consultó el token de ${votante.codigoEstudiante}.`, await obtenerIp());
+  return {
+    ok: true,
+    mensaje: "",
+    token: { codigo: votante.codigoEstudiante, nombre: `${votante.nombres} ${votante.apellidos}`, valor: descifrarToken(votante.entrega.cifrado) },
+  };
+}
+
+/** Lista para descargar con los tokens pendientes de todo el padrón. Queda registrado en la auditoría. */
+export async function exportarTokens(): Promise<RespuestaVotante> {
+  const admin = await exigirAdmin();
+  const votantes = await prisma.votante.findMany({
+    where: { token: { is: { estado: "PENDIENTE" } }, entrega: { isNot: null } },
+    orderBy: [{ apellidos: "asc" }, { nombres: "asc" }],
+    include: { entrega: true },
+  });
+  if (votantes.length === 0) return { ok: false, mensaje: "No hay tokens pendientes para descargar." };
+
+  await registrarLog("TOKEN_EXPORTADO", `${admin.nombre} descargó ${votantes.length} tokens pendientes.`, await obtenerIp());
+  return {
+    ok: true,
+    mensaje: `${votantes.length} tokens descargados.`,
+    tokens: votantes.map((v) => ({
+      codigo: v.codigoEstudiante,
+      apellidos: v.apellidos,
+      nombres: v.nombres,
+      correo: v.correo ?? "",
+      token: descifrarToken(v.entrega!.cifrado),
+    })),
   };
 }

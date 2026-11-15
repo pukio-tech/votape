@@ -1,7 +1,26 @@
 import { prisma } from "./prisma";
-import { generarToken, hashToken } from "./tokens";
+import { cifrarToken, generarToken, hashToken } from "./tokens";
 
 // Compartido por el panel (/admin/votantes) y los scripts de línea de comandos.
+
+/**
+ * Asigna un token al votante: guarda su hash (para validar el ingreso) y una copia cifrada
+ * (para que el comité pueda consultarlo en el panel). Deja el token en PENDIENTE.
+ */
+export async function asignarToken(votanteId: string, token: string) {
+  await prisma.$transaction([
+    prisma.tokenAcceso.upsert({
+      where: { votanteId },
+      create: { votanteId, tokenHash: hashToken(token) },
+      update: { tokenHash: hashToken(token), estado: "PENDIENTE", fechaGeneracion: new Date(), fechaUso: null, ipUso: null },
+    }),
+    prisma.tokenEntrega.upsert({
+      where: { votanteId },
+      create: { votanteId, cifrado: cifrarToken(token) },
+      update: { cifrado: cifrarToken(token) },
+    }),
+  ]);
+}
 
 /** Interpreta un CSV separado por "," o ";" (como lo exporta Excel en español). */
 export function parsearCsv(texto: string): Record<string, string>[] {
@@ -87,11 +106,7 @@ export async function registrarPadron(filas: FilaPadron[], regenerar = false) {
     if (votante.token && !(regenerar && votante.token.estado === "PENDIENTE")) continue;
 
     const token = generarToken();
-    await prisma.tokenAcceso.upsert({
-      where: { votanteId: votante.id },
-      create: { votanteId: votante.id, tokenHash: hashToken(token) },
-      update: { tokenHash: hashToken(token), fechaGeneracion: new Date() },
-    });
+    await asignarToken(votante.id, token);
     salida.push({
       codigo: votante.codigoEstudiante,
       dni: votante.dni ?? "",

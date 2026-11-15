@@ -7,6 +7,8 @@ import {
   ChevronRight,
   Copy,
   Download,
+  Eye,
+  EyeOff,
   FileUp,
   KeyRound,
   Loader2,
@@ -21,9 +23,11 @@ import { useActionState, useState, useTransition } from "react";
 import {
   anularToken,
   eliminarVotante,
+  exportarTokens,
   guardarVotante,
   importarVotantes,
   regenerarToken,
+  verToken,
   type RespuestaVotante,
 } from "@/app/admin/acciones-votantes";
 import { Modal } from "@/components/Modal";
@@ -38,6 +42,7 @@ type Votante = {
   apellidos: string;
   correo: string | null;
   estado: "PENDIENTE" | "USADO" | "ANULADO" | null;
+  tieneCopia: boolean;
   fechaUso: string | null;
 };
 
@@ -83,6 +88,34 @@ export function GestionVotantes({
   const [dialogo, setDialogo] = useState<Dialogo>(null);
   const [aviso, setAviso] = useState<RespuestaVotante>(null);
   const [pendiente, startTransition] = useTransition();
+  const [visibles, setVisibles] = useState<Record<string, string>>({});
+  const [copiado, setCopiado] = useState("");
+
+  function alternarToken(v: Votante) {
+    if (visibles[v.id]) {
+      setVisibles((s) => Object.fromEntries(Object.entries(s).filter(([id]) => id !== v.id)));
+      return;
+    }
+    startTransition(async () => {
+      const r = await verToken(v.id);
+      if (r?.token) setVisibles((s) => ({ ...s, [v.id]: r.token!.valor }));
+      else setAviso(r);
+    });
+  }
+
+  async function copiar(id: string, valor: string) {
+    await navigator.clipboard.writeText(valor).catch(() => null);
+    setCopiado(id);
+    setTimeout(() => setCopiado((c) => (c === id ? "" : c)), 1500);
+  }
+
+  function descargarTodos() {
+    startTransition(async () => {
+      const r = await exportarTokens();
+      if (r?.tokens) descargarCsv(r.tokens);
+      setAviso(r);
+    });
+  }
 
   const url = (cambios: Partial<typeof filtros>) => {
     const f = { ...filtros, ...cambios };
@@ -114,7 +147,10 @@ export function GestionVotantes({
             {resumen.anulados ? ` · ${resumen.anulados} anulados` : ""}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button onClick={descargarTodos} disabled={pendiente} className={boton.secundario}>
+            <Download className="size-4" aria-hidden /> Descargar tokens
+          </button>
           <button onClick={() => setDialogo({ tipo: "importar" })} className={boton.secundario}>
             <FileUp className="size-4" aria-hidden /> Importar CSV
           </button>
@@ -149,7 +185,7 @@ export function GestionVotantes({
 
       <div className={`${tarjeta} mt-4 overflow-hidden`}>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[900px] text-sm">
             <thead className="bg-marca-800 text-left text-xs uppercase tracking-wide text-white">
               <tr>
                 <th className="px-4 py-3 font-semibold">Código</th>
@@ -157,13 +193,14 @@ export function GestionVotantes({
                 <th className="px-4 py-3 font-semibold">Apellidos y nombres</th>
                 <th className="px-4 py-3 font-semibold">Correo</th>
                 <th className="px-4 py-3 font-semibold">Estado</th>
+                <th className="px-4 py-3 font-semibold">Token</th>
                 <th className="px-4 py-3 text-right font-semibold">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {votantes.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
                     {filtros.q || filtros.estado ? "No hay votantes que coincidan con la búsqueda." : "Aún no hay votantes. Regístralos o importa un CSV."}
                   </td>
                 </tr>
@@ -178,6 +215,38 @@ export function GestionVotantes({
                   <td className="max-w-48 truncate px-4 py-3 text-slate-600">{v.correo ?? "—"}</td>
                   <td className="whitespace-nowrap px-4 py-3" title={v.fechaUso ? `Votó el ${formatearFecha(v.fechaUso)}` : undefined}>
                     <InsigniaEstado estado={v.estado} />
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-2">
+                    {v.estado === "USADO" ? (
+                      <span className="text-xs text-slate-400">Ya usado</span>
+                    ) : v.estado && v.tieneCopia ? (
+                      <div className="flex items-center gap-1">
+                        <span className={`font-mono text-sm tracking-wider ${visibles[v.id] ? "font-semibold text-marca-950" : "text-slate-400"}`}>
+                          {visibles[v.id] ?? "•••••-•••••"}
+                        </span>
+                        <button
+                          className={botonIcono}
+                          disabled={pendiente}
+                          onClick={() => alternarToken(v)}
+                          title={visibles[v.id] ? "Ocultar token" : "Ver token"}
+                          aria-label={`${visibles[v.id] ? "Ocultar" : "Ver"} token de ${v.codigoEstudiante}`}
+                        >
+                          {visibles[v.id] ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        </button>
+                        {visibles[v.id] && (
+                          <button
+                            className={botonIcono}
+                            onClick={() => copiar(v.id, visibles[v.id])}
+                            title="Copiar token"
+                            aria-label={`Copiar token de ${v.codigoEstudiante}`}
+                          >
+                            {copiado === v.id ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-400">{v.estado ? "Genera uno nuevo para verlo" : "—"}</span>
+                    )}
                   </td>
                   <td className="px-4 py-2">
                     <div className="flex justify-end gap-0.5">
@@ -343,7 +412,7 @@ function TokenGenerado({ token, onCerrar }: { token: NonNullable<NonNullable<Res
   return (
     <Modal
       titulo="Token de acceso"
-      descripcion="Entrégalo al votante. Por seguridad no se volverá a mostrar."
+      descripcion="Entrégalo al votante. También puedes consultarlo después en la tabla."
       onCerrar={onCerrar}
       pie={
         <button onClick={onCerrar} className={boton.primario}>
@@ -398,7 +467,7 @@ function FormImportar({ onCerrar, onListo }: { onCerrar: () => void; onListo: ()
           {estado.tokens && estado.tokens.length > 0 ? (
             <>
               <p className="text-sm text-slate-600">
-                Descarga ahora el archivo con los tokens nuevos. <strong>Es la única vez que se pueden obtener.</strong>
+                Descarga el archivo con los tokens nuevos. También puedes verlos luego en la tabla.
               </p>
               <button onClick={() => descargarCsv(estado.tokens!)} className={`${boton.primario} w-full`}>
                 <Download className="size-4" aria-hidden /> Descargar tokens (CSV)
