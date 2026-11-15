@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { z } from "zod";
 import { exigirAdmin } from "@/lib/autorizacion";
 import { asignarToken, parsearCsv, registrarPadron, validarPadron } from "@/lib/padron";
 import { obtenerIp } from "@/lib/peticion";
 import { prisma } from "@/lib/prisma";
-import { registrarLog } from "@/lib/proceso";
+import { obtenerProceso, registrarLog } from "@/lib/proceso";
+import { celularValido, enlaceWhatsapp, normalizarCelular } from "@/lib/telefono";
 import { descifrarToken, generarToken } from "@/lib/tokens";
 
 /** Respuesta de las acciones de votantes. `token` solo viaja una vez, al generarlo. */
@@ -15,6 +17,7 @@ export type RespuestaVotante = {
   mensaje: string;
   token?: { codigo: string; nombre: string; valor: string };
   tokens?: Record<string, string>[];
+  enlace?: string;
   errores?: string[];
 } | null;
 
@@ -36,6 +39,9 @@ const esquemaVotante = z.object({
   nombres: z.string().trim().min(1, "Ingresa los nombres.").max(80),
   apellidos: z.string().trim().min(1, "Ingresa los apellidos.").max(80),
   correo: opcional(160).refine((v) => !v || z.string().email().safeParse(v).success, "Correo no válido."),
+  celular: opcional(20)
+    .transform((v) => normalizarCelular(v))
+    .refine((v) => !v || celularValido(v), "El celular debe tener 9 dígitos (o el código de país y el número)."),
 });
 
 export async function guardarVotante(_prev: RespuestaVotante, formData: FormData): Promise<RespuestaVotante> {
@@ -46,6 +52,7 @@ export async function guardarVotante(_prev: RespuestaVotante, formData: FormData
     nombres: formData.get("nombres"),
     apellidos: formData.get("apellidos"),
     correo: formData.get("correo") ?? "",
+    celular: formData.get("celular") ?? "",
   });
   if (!datos.success) return { ok: false, mensaje: datos.error.issues[0].message };
   const id = String(formData.get("id") ?? "");
@@ -175,4 +182,37 @@ export async function exportarTokens(): Promise<RespuestaVotante> {
       token: descifrarToken(v.entrega!.cifrado),
     })),
   };
+}
+
+/**
+ * Arma el enlace de WhatsApp con el código, el token y la dirección para votar.
+ * El comité solo tiene que pulsar "Enviar". Queda registrado en la auditoría.
+ */
+export async function mensajeWhatsapp(id: string): Promise<RespuestaVotante> {
+  const admin = await exigirAdmin();
+  const votante = await prisma.votante.findUnique({ where: { id }, include: { token: true, entrega: true } });
+  if (!votante) return { ok: false, mensaje: "El votante no existe." };
+  if (!votante.celular) return { ok: false, mensaje: "Este votante no tiene celular registrado. Edítalo para agregarlo." };
+  if (votante.token?.estado === "USADO") return { ok: false, mensaje: "Este votante ya votó." };
+  if (votante.token?.estado !== "PENDIENTE" || !votante.entrega) {
+    return { ok: false, mensaje: "Este votante no tiene un token vigente. Genera uno nuevo." };
+  }
+
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+  const protocolo = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const proceso = await obtenerProceso();
+  const mensaje = [
+    `Hola ${votante.nombres.split(" ")[0]}, este es tu acceso para votar${proceso ? ` en *${proceso.titulo}*` : ""}:`,
+    "",
+    `Código: *${votante.codigoEstudiante}*`,
+    `Token: *${descifrarToken(votante.entrega.cifrado)}*`,
+    "",
+    `Ingresa aquí: ${protocolo}://${host}`,
+    "",
+    "Tu voto es secreto. No compartas tu token: solo sirve para votar una vez.",
+  ].join("\n");
+
+  await registrarLog("TOKEN_WHATSAPP", `${admin.nombre} preparó el envío por WhatsApp del token de ${votante.codigoEstudiante}.`, await obtenerIp());
+  return { ok: true, mensaje: "", enlace: enlaceWhatsapp(votante.celular, mensaje) };
 }

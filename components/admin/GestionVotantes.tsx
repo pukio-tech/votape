@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  MessageCircle,
   Download,
   Eye,
   EyeOff,
@@ -26,6 +27,7 @@ import {
   exportarTokens,
   guardarVotante,
   importarVotantes,
+  mensajeWhatsapp,
   regenerarToken,
   verToken,
   type RespuestaVotante,
@@ -41,6 +43,7 @@ type Votante = {
   nombres: string;
   apellidos: string;
   correo: string | null;
+  celular: string | null;
   estado: "PENDIENTE" | "USADO" | "ANULADO" | null;
   tieneCopia: boolean;
   fechaUso: string | null;
@@ -109,6 +112,21 @@ export function GestionVotantes({
     setTimeout(() => setCopiado((c) => (c === id ? "" : c)), 1500);
   }
 
+  function enviarWhatsapp(v: Votante) {
+    // La pestaña se abre en el mismo clic (si se abre después de esperar, el navegador la bloquea).
+    const ventana = window.open("about:blank", "_blank");
+    startTransition(async () => {
+      const r = await mensajeWhatsapp(v.id);
+      if (r?.enlace) {
+        if (ventana) ventana.location.href = r.enlace;
+        else window.location.href = r.enlace;
+      } else {
+        ventana?.close();
+        setAviso(r);
+      }
+    });
+  }
+
   function descargarTodos() {
     startTransition(async () => {
       const r = await exportarTokens();
@@ -168,6 +186,15 @@ export function GestionVotantes({
 
   const acciones = (v: Votante) => (
     <>
+      <button
+        className="grid size-10 place-items-center rounded-lg text-emerald-600 transition hover:bg-emerald-50 hover:text-emerald-700 disabled:pointer-events-none disabled:opacity-30 md:size-8"
+        disabled={!v.celular || v.estado !== "PENDIENTE" || !v.tieneCopia || pendiente}
+        onClick={() => enviarWhatsapp(v)}
+        title={v.celular ? `Enviar código y token por WhatsApp al ${v.celular}` : "Sin celular registrado"}
+        aria-label={`Enviar token por WhatsApp a ${v.codigoEstudiante}`}
+      >
+        <MessageCircle className="size-4" />
+      </button>
       <button className={botonIcono} onClick={() => setDialogo({ tipo: "form", votante: v })} title="Editar" aria-label={`Editar a ${v.codigoEstudiante}`}>
         <Pencil className="size-4" />
       </button>
@@ -262,6 +289,7 @@ export function GestionVotantes({
                     {v.codigoEstudiante}
                     {v.dni ? ` · DNI ${v.dni}` : ""}
                   </p>
+                  {v.celular && <p className="text-sm tabular-nums text-slate-500">Cel. {v.celular}</p>}
                   {v.correo && <p className="truncate text-sm text-slate-500">{v.correo}</p>}
                 </div>
                 <InsigniaEstado estado={v.estado} />
@@ -301,8 +329,11 @@ export function GestionVotantes({
                 <tr key={v.id} className="hover:bg-marca-50/40">
                   <td className="whitespace-nowrap px-4 py-3 font-mono text-marca-900">{v.codigoEstudiante}</td>
                   <td className="whitespace-nowrap px-4 py-3 tabular-nums text-slate-600">{v.dni ?? "—"}</td>
-                  <td className="px-4 py-3 font-medium text-marca-950">
-                    {v.apellidos}, {v.nombres}
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-marca-950">
+                      {v.apellidos}, {v.nombres}
+                    </p>
+                    {v.celular && <p className="text-xs tabular-nums text-slate-500">Cel. {v.celular}</p>}
                   </td>
                   <td className="hidden max-w-48 truncate px-4 py-3 text-slate-600 lg:table-cell">{v.correo ?? "—"}</td>
                   <td className="whitespace-nowrap px-4 py-3" title={v.fechaUso ? `Votó el ${formatearFecha(v.fechaUso)}` : undefined}>
@@ -419,10 +450,23 @@ function FormVotante({
             <input name="apellidos" required defaultValue={votante?.apellidos} placeholder="Huamán Pérez" className={`${campo} mt-1.5`} />
           </label>
         </div>
-        <label className="block text-sm font-semibold text-marca-900">
-          Correo <span className="font-normal text-slate-400">(opcional)</span>
-          <input name="correo" type="email" defaultValue={votante?.correo ?? ""} placeholder="rosa.huaman@unsm.edu.pe" className={`${campo} mt-1.5`} />
-        </label>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block text-sm font-semibold text-marca-900">
+            Celular (WhatsApp)
+            <input
+              name="celular"
+              type="tel"
+              inputMode="tel"
+              defaultValue={votante?.celular ?? ""}
+              placeholder="987654321"
+              className={`${campo} mt-1.5`}
+            />
+          </label>
+          <label className="block text-sm font-semibold text-marca-900">
+            Correo <span className="font-normal text-slate-400">(opcional)</span>
+            <input name="correo" type="email" defaultValue={votante?.correo ?? ""} placeholder="rosa.huaman@unsm.edu.pe" className={`${campo} mt-1.5`} />
+          </label>
+        </div>
         {estado && !estado.ok && <Alerta tipo="error">{estado.mensaje}</Alerta>}
         <div className={piePanel}>
           <button type="button" onClick={onCerrar} className={boton.secundario}>
@@ -513,7 +557,7 @@ function FormImportar({ onCerrar, onListo }: { onCerrar: () => void; onListo: ()
         </div>
       ) : (
         <form action={accion} className="space-y-4">
-          <code className="block rounded-lg bg-slate-100 px-3 py-2 font-mono text-xs text-marca-900">codigo;dni;nombres;apellidos;correo</code>
+          <code className="block rounded-lg bg-slate-100 px-3 py-2 font-mono text-xs text-marca-900">codigo;dni;nombres;apellidos;correo;celular</code>
           <p className="text-xs text-slate-500">
             Si un código ya existe, se actualizan sus datos y conserva su token. Solo se generan tokens para los votantes nuevos.
           </p>

@@ -61,6 +61,7 @@ model Votante {
   nombres          String
   apellidos        String
   correo           String?
+  celular          String?
 
   token         TokenAcceso?
   participacion RegistroParticipacion?

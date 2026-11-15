@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { normalizarCelular } from "./telefono";
 import { cifrarToken, generarToken, hashToken } from "./tokens";
 
 // Compartido por el panel (/admin/votantes) y los scripts de línea de comandos.
@@ -62,7 +63,14 @@ export function parsearCsv(texto: string): Record<string, string>[] {
   });
 }
 
-export type FilaPadron = { codigoEstudiante: string; dni?: string; nombres: string; apellidos: string; correo?: string };
+export type FilaPadron = {
+  codigoEstudiante: string;
+  dni?: string;
+  nombres: string;
+  apellidos: string;
+  correo?: string;
+  celular?: string;
+};
 
 /** Convierte las filas del CSV en votantes y reporta los errores por fila. */
 export function validarPadron(filas: Record<string, string>[]) {
@@ -80,6 +88,7 @@ export function validarPadron(filas: Record<string, string>[]) {
         nombres: f.nombres.slice(0, 80),
         apellidos: f.apellidos.slice(0, 80),
         correo: f.correo || undefined,
+        celular: normalizarCelular(f.celular || f.ncelular || f.telefono || f.whatsapp) ?? undefined,
       },
     ];
   });
@@ -99,7 +108,7 @@ export async function registrarPadron(filas: FilaPadron[], regenerar = false) {
     const votante = await prisma.votante.upsert({
       where: { codigoEstudiante: fila.codigoEstudiante },
       create: fila,
-      update: { dni: fila.dni, nombres: fila.nombres, apellidos: fila.apellidos, correo: fila.correo },
+      update: { dni: fila.dni, nombres: fila.nombres, apellidos: fila.apellidos, correo: fila.correo, celular: fila.celular },
       include: { token: true },
     });
 
@@ -113,6 +122,7 @@ export async function registrarPadron(filas: FilaPadron[], regenerar = false) {
       apellidos: votante.apellidos,
       nombres: votante.nombres,
       correo: votante.correo ?? "",
+      celular: votante.celular ?? "",
       token,
     });
   }
