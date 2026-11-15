@@ -95,7 +95,7 @@ export function Cedula({ votante, codigo, cargos }: { votante: string; codigo: s
           >
             <div className="mb-4 flex items-end justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-acento-600">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-acento-700">
                   Cargo {i + 1} de {cargos.length}
                 </p>
                 <h2 id={`cargo-${cargo.id}`} className="mt-1 text-xl font-bold tracking-tight text-marca-950">
@@ -302,7 +302,7 @@ function Confirmacion({
             <li key={cargo.id} className="flex items-center gap-3.5 rounded-2xl bg-slate-50 p-3 ring-1 ring-inset ring-slate-200/70">
               {c && <Foto url={c.fotoUrl} nombre={c.nombreCompleto} className="size-14 text-base" />}
               <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wider text-acento-600">{cargo.nombre}</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-acento-700">{cargo.nombre}</p>
                 <p className="font-bold text-marca-950">{c?.nombreCompleto}</p>
               </div>
             </li>

@@ -14,13 +14,15 @@ export async function PantallaAcceso({
   estado?: ReactNode;
   children: ReactNode;
 }) {
-  const { nombrePlataforma } = await obtenerAjustes();
+  const { nombrePlataforma, logoUrl } = await obtenerAjustes();
   return (
     <div className="flex min-h-dvh flex-1 flex-col">
       <header className="bg-marca-800 px-4 pb-24 pt-6 text-white sm:pb-28">
         <div className="mx-auto max-w-md">
-          <Logo nombre={nombrePlataforma} claro />
-          <div className="mt-8 text-center">
+          <div className={logoUrl ? "flex justify-center" : ""}>
+            <Logo nombre={nombrePlataforma} logoUrl={logoUrl} claro grande />
+          </div>
+          <div className={`${logoUrl ? "mt-5" : "mt-8"} text-center`}>
             {subtitulo && <p className="text-xs font-semibold uppercase tracking-[0.16em] text-acento-300">{subtitulo}</p>}
             <h1 className="mt-1.5 text-2xl font-bold leading-tight text-balance sm:text-3xl">{titulo}</h1>
             {estado && <div className="mt-4">{estado}</div>}

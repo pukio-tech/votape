@@ -31,7 +31,7 @@ export default async function ResultadosPublicos() {
         {resultados ? (
           <>
             <div className="mb-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-acento-600">Conteo oficial en tiempo real</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-acento-700">Conteo oficial en tiempo real</p>
               <h2 className="mt-1 text-2xl font-bold tracking-tight text-marca-950 sm:text-3xl">{resultados.proceso.titulo}</h2>
             </div>
             <TableroResultados inicial={resultados} />

@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { obtenerImagen } from "@/lib/almacenamiento";
 
-// Sirve las fotos de candidatos guardadas en S3 (son públicas: aparecen en la cédula y los resultados).
+// Sirve las imágenes guardadas en S3: fotos de candidatos y logo de la plataforma (son públicas).
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ clave: string[] }> }) {
   const clave = (await params).clave.join("/");
-  if (!/^candidatos\/[a-zA-Z0-9-]+\.(jpg|png|webp)$/.test(clave)) {
+  if (!/^(candidatos|marca)\/[a-zA-Z0-9-]+\.(jpg|png|webp)$/.test(clave)) {
     return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   }
   try {

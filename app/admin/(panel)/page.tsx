@@ -28,7 +28,7 @@ export default async function Tablero() {
     <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-acento-600">{resultados.proceso.institucion}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-acento-700">{resultados.proceso.institucion}</p>
           <h2 className="mt-1 text-2xl font-bold tracking-tight text-marca-950">{resultados.proceso.titulo}</h2>
         </div>
         <Link

@@ -4,31 +4,31 @@
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  /* Azul institucional (tipo ONPE) */
-  --color-marca-50: #eef4fb;
-  --color-marca-100: #d7e6f6;
-  --color-marca-200: #b0cdec;
-  --color-marca-300: #7fb0df;
-  --color-marca-400: #4b8bcb;
-  --color-marca-500: #2368b3;
-  --color-marca-600: #1a56a0;
-  --color-marca-700: #154785;
-  --color-marca-800: #0f3a6e;
-  --color-marca-900: #0a2a52;
-  --color-marca-950: #061b36;
+  /* Verde CLAVE (texto del logo, #106818) */
+  --color-marca-50: #eef7f0;
+  --color-marca-100: #d4ecda;
+  --color-marca-200: #a9d8b5;
+  --color-marca-300: #74bd86;
+  --color-marca-400: #43a05b;
+  --color-marca-500: #24853d;
+  --color-marca-600: #18742f;
+  --color-marca-700: #136126;
+  --color-marca-800: #0f4f1f;
+  --color-marca-900: #0b3d18;
+  --color-marca-950: #06240e;
 
-  /* Celeste de acento (barras de resultados, detalles) */
-  --color-acento-50: #f0f7fd;
-  --color-acento-100: #dceefa;
-  --color-acento-200: #bfdff4;
-  --color-acento-300: #a3cfee;
-  --color-acento-400: #87bee5;
-  --color-acento-500: #5fa5da;
-  --color-acento-600: #3d88c6;
-  --color-acento-700: #2c6ca3;
-  --color-acento-800: #23557f;
+  /* Dorado de la llave (#F0B000) */
+  --color-acento-50: #fff9e6;
+  --color-acento-100: #fff0c2;
+  --color-acento-200: #ffe08a;
+  --color-acento-300: #fbcd47;
+  --color-acento-400: #f0b000;
+  --color-acento-500: #d89c00;
+  --color-acento-600: #a77700;
+  --color-acento-700: #8a6200;
+  --color-acento-800: #6b4c05;
 
-  --color-lienzo: #f3f6fa;
+  --color-lienzo: #f5f7f3;
 
   --animate-aparecer: aparecer 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-subir: subir 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;

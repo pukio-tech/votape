@@ -5,7 +5,7 @@ import { obtenerAdmin } from "@/lib/sesion";
 
 const TAMANO_MAXIMO = 5 * 1024 * 1024;
 
-/** Sube una foto de candidato a S3. Solo administradores. */
+/** Sube una foto de candidato o el logo de la plataforma a S3. Solo administradores. */
 export async function POST(request: NextRequest) {
   const origen = request.headers.get("origin");
   const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
@@ -16,14 +16,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
 
-  const archivo = (await request.formData().catch(() => null))?.get("archivo");
+  const formulario = await request.formData().catch(() => null);
+  const archivo = formulario?.get("archivo");
+  const carpeta = formulario?.get("carpeta") === "marca" ? "marca" : "candidatos";
   if (!(archivo instanceof File)) return NextResponse.json({ error: "Adjunta una imagen." }, { status: 400 });
   const extension = TIPOS_IMAGEN[archivo.type];
   if (!extension) return NextResponse.json({ error: "Usa una imagen JPG, PNG o WEBP." }, { status: 400 });
   if (archivo.size > TAMANO_MAXIMO) return NextResponse.json({ error: "La imagen supera los 5 MB." }, { status: 400 });
 
   try {
-    const url = await subirImagen(`candidatos/${randomUUID()}.${extension}`, new Uint8Array(await archivo.arrayBuffer()), archivo.type);
+    const url = await subirImagen(`${carpeta}/${randomUUID()}.${extension}`, new Uint8Array(await archivo.arrayBuffer()), archivo.type);
     return NextResponse.json({ url });
   } catch (e) {
     console.error("Error al subir imagen", e);

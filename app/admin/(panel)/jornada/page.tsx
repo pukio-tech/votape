@@ -2,6 +2,7 @@ import { Ban, KeyRound, Users, Vote } from "lucide-react";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { ControlJornada } from "@/components/admin/ControlJornada";
+import { FormLogo } from "@/components/admin/FormLogo";
 import { FormNombrePlataforma } from "@/components/admin/FormNombrePlataforma";
 import { FormProceso } from "@/components/admin/FormProceso";
 import { tarjeta } from "@/components/ui";
@@ -13,7 +14,7 @@ import { obtenerAdmin } from "@/lib/sesion";
 export default async function Jornada() {
   if ((await obtenerAdmin())?.rol !== "ADMIN") redirect("/admin");
 
-  const [proceso, padron, votaron, tokens, { nombrePlataforma }] = await Promise.all([
+  const [proceso, padron, votaron, tokens, { nombrePlataforma, logoUrl }] = await Promise.all([
     obtenerProceso(),
     prisma.votante.count(),
     prisma.registroParticipacion.count(),
@@ -62,9 +63,16 @@ export default async function Jornada() {
       </section>
 
       <section className={`${tarjeta} mt-6 p-5 sm:p-6`}>
-        <h3 className="font-bold text-marca-950">Nombre de la plataforma</h3>
-        <div className="mt-4">
-          <FormNombrePlataforma nombre={nombrePlataforma} />
+        <h3 className="font-bold text-marca-950">Identidad de la plataforma</h3>
+        <div className="mt-4 grid gap-8 lg:grid-cols-2">
+          <div>
+            <p className="mb-2 text-sm font-semibold text-marca-900">Nombre</p>
+            <FormNombrePlataforma nombre={nombrePlataforma} />
+          </div>
+          <div>
+            <p className="mb-2 text-sm font-semibold text-marca-900">Logo</p>
+            <FormLogo logoUrl={logoUrl} />
+          </div>
         </div>
       </section>
     </main>

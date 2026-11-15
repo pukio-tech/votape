@@ -145,5 +145,7 @@ model Ajustes {
   nombrePlataforma  String   @default("VotaPE")
   // Plantilla del mensaje de WhatsApp con el acceso; null = plantilla por defecto.
   plantillaWhatsapp String?  @db.Text
+  // Logo (emblema) mostrado en encabezados e ingresos; null = ícono por defecto.
+  logoUrl           String?
   updatedAt         DateTime @updatedAt
 }

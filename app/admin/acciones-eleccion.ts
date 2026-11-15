@@ -204,3 +204,17 @@ export async function guardarNombrePlataforma(_prev: Respuesta, formData: FormDa
   revalidatePath("/", "layout");
   return { ok: true, mensaje: `La plataforma ahora se llama "${nombre.data}".` };
 }
+
+export async function guardarLogo(_prev: Respuesta, formData: FormData): Promise<Respuesta> {
+  const admin = await exigirAdmin();
+  const url = String(formData.get("logoUrl") ?? "");
+  if (url && !url.startsWith(`${PREFIJO_IMAGENES}marca/`)) return { ok: false, mensaje: "Logo no válido. Súbelo de nuevo." };
+
+  const actual = await prisma.ajustes.findUnique({ where: { id: "general" } });
+  const logoUrl = url || null;
+  await prisma.ajustes.upsert({ where: { id: "general" }, create: { id: "general", logoUrl }, update: { logoUrl } });
+  if (actual?.logoUrl && actual.logoUrl !== logoUrl) await borrarImagenPorUrl(actual.logoUrl);
+  await registrarLog("AJUSTES_EDITADOS", `${admin.nombre} ${logoUrl ? "cambió" : "quitó"} el logo de la plataforma.`, await obtenerIp());
+  revalidatePath("/", "layout");
+  return { ok: true, mensaje: logoUrl ? "Logo actualizado." : "Se quitó el logo; se usa el ícono por defecto." };
+}
