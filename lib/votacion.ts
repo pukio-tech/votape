@@ -3,6 +3,7 @@ import { randomInt, randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { estadoVotacion, obtenerProceso } from "./proceso";
+import { preferenciasRequeridas } from "./rondas";
 import { generarConstancia, sha256 } from "./tokens";
 
 export class VotoError extends Error {
@@ -43,22 +44,31 @@ export async function emitirVoto(votanteId: string, selecciones: Record<string, 
     select: { id: true, nombre: true, maxSelecciones: true, candidatos: { select: { id: true } } },
   });
 
-  // La cédula debe traer de 1 a `maxSelecciones` candidatos válidos y distintos por cada cargo.
+  // Un candidato por cargo; en los cargos por rondas, exactamente N preferencias distintas y en
+  // orden (así el voto cuenta en todas las rondas).
   if (Object.keys(selecciones).length !== cargos.length) {
-    throw new VotoError("CEDULA_INVALIDA", "Debes elegir al menos un candidato en cada cargo.");
+    throw new VotoError("CEDULA_INVALIDA", "Debes completar todos los cargos.");
   }
   const votos = cargos.flatMap((cargo) => {
     const elegidos = selecciones[cargo.id] ?? [];
-    if (elegidos.length === 0 || new Set(elegidos).size !== elegidos.length) {
-      throw new VotoError("CEDULA_INVALIDA", `Revisa tu selección en ${cargo.nombre}.`);
-    }
-    if (elegidos.length > cargo.maxSelecciones) {
-      throw new VotoError("CEDULA_INVALIDA", `En ${cargo.nombre} puedes elegir como máximo ${cargo.maxSelecciones}.`);
+    const porRondas = cargo.maxSelecciones > 1;
+    const requeridas = porRondas ? preferenciasRequeridas(cargo.maxSelecciones, cargo.candidatos.length) : 1;
+    if (elegidos.length !== requeridas || new Set(elegidos).size !== elegidos.length) {
+      throw new VotoError(
+        "CEDULA_INVALIDA",
+        porRondas ? `En ${cargo.nombre} debes ordenar ${requeridas} preferencias.` : `Revisa tu selección en ${cargo.nombre}.`,
+      );
     }
     if (!elegidos.every((id) => cargo.candidatos.some((c) => c.id === id))) {
       throw new VotoError("CEDULA_INVALIDA", "La cédula contiene una selección no válida.");
     }
-    return elegidos.map((candidatoId) => ({ cargoId: cargo.id, candidatoId }));
+    const papeleta = porRondas ? randomUUID() : null;
+    return elegidos.map((candidatoId, i) => ({
+      cargoId: cargo.id,
+      candidatoId,
+      preferencia: porRondas ? i + 1 : null,
+      papeleta,
+    }));
   });
 
   // La hora del voto se trunca a la hora en punto y el id es aleatorio (no un cuid,
@@ -88,6 +98,8 @@ export async function emitirVoto(votanteId: string, selecciones: Record<string, 
           procesoId: proceso.id,
           cargoId: v.cargoId,
           candidatoId: v.candidatoId,
+          preferencia: v.preferencia,
+          papeleta: v.papeleta,
           fechaEmision: horaTruncada,
         })),
       });

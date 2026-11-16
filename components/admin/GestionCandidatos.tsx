@@ -91,7 +91,7 @@ export function GestionCandidatos({ cargos, hayVotos }: { cargos: Cargo[]; hayVo
                 </span>
                 {cargo.maxSelecciones > 1 && (
                   <span className="ml-2 inline-flex rounded-full bg-acento-100 px-2.5 py-0.5 align-middle text-xs font-semibold text-acento-800">
-                    Se eligen {cargo.maxSelecciones}
+                    {cargo.maxSelecciones} puestos por rondas
                   </span>
                 )}
               </h3>
@@ -232,7 +232,7 @@ function FormCargo({ cargo, onCerrar, onListo }: { cargo?: Cargo; onCerrar: () =
           <input name="nombre" required autoFocus defaultValue={cargo?.nombre} placeholder="Presidencia" className={`${campo} mt-1.5`} />
         </label>
         <label className="block text-sm font-semibold text-marca-900">
-          ¿Cuántas personas se eligen?
+          ¿Cuántos puestos se eligen?
           <input
             name="maxSelecciones"
             type="number"
@@ -244,8 +244,9 @@ function FormCargo({ cargo, onCerrar, onListo }: { cargo?: Cargo; onCerrar: () =
             className={`${campo} mt-1.5 sm:w-32`}
           />
           <span className="mt-1.5 block text-xs font-normal text-slate-500">
-            Con 1, el votante marca un solo candidato. Con más (por ejemplo 3 para Asesores), puede marcar hasta ese número y quedan
-            elegidos los más votados.
+            Con 1, el votante marca un solo candidato. Con más (por ejemplo 3 en Asesores), cada votante elige ese número de
+            candidatos en orden de preferencia y se decide por rondas: el 1.er puesto con todos los votos, el 2.º sin el ganador
+            anterior, y así sucesivamente.
           </span>
         </label>
         {estado && !estado.ok && <Alerta tipo="error">{estado.mensaje}</Alerta>}

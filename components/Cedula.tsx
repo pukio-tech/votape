@@ -4,6 +4,7 @@ import { ArrowRight, BarChart3, Check, CheckCircle2, Copy, Loader2, Printer, Shi
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { formatearFecha } from "@/lib/fechas";
+import { preferenciasRequeridas } from "@/lib/rondas";
 import { PanelLateral } from "./PanelLateral";
 import { Alerta, boton, tarjeta } from "./ui";
 
@@ -34,7 +35,10 @@ export function Cedula({
   const secciones = useRef<Record<string, HTMLElement | null>>({});
 
   const elegidos = (cargoId: string) => selecciones[cargoId] ?? [];
-  const completos = cargos.filter((c) => elegidos(c.id).length > 0).length;
+  /** Preferencias que exige el cargo: 1, o N en orden para los cargos por rondas (ej. Asesores). */
+  const requeridas = (c: Cargo) => (c.maxSelecciones > 1 ? preferenciasRequeridas(c.maxSelecciones, c.candidatos.length) : 1);
+  const completo = (c: Cargo) => elegidos(c.id).length === requeridas(c);
+  const completos = cargos.filter(completo).length;
   const todoListo = completos === cargos.length;
   const hayMultiples = cargos.some((c) => c.maxSelecciones > 1);
 
@@ -55,7 +59,7 @@ export function Cedula({
     if (cargo.maxSelecciones > 1) {
       // Selección múltiple: marca o desmarca, sin pasar del límite.
       const marcado = actuales.includes(candidatoId);
-      if (!marcado && actuales.length >= cargo.maxSelecciones) return;
+      if (!marcado && actuales.length >= requeridas(cargo)) return;
       setSelecciones({ ...selecciones, [cargo.id]: marcado ? actuales.filter((id) => id !== candidatoId) : [...actuales, candidatoId] });
       return;
     }
@@ -106,7 +110,7 @@ export function Cedula({
           </div>
           <p className="flex items-start gap-2 text-sm text-marca-800 sm:max-w-sm">
             <ShieldCheck className="mt-0.5 size-[18px] shrink-0 text-marca-500" aria-hidden />
-            Elige un candidato por cargo{hayMultiples ? " (donde se indica, puedes marcar más de uno)" : ""}. Podrás revisar tu cédula antes de
+            Elige un candidato por cargo{hayMultiples ? " (en los cargos por puestos, elige en orden de preferencia)" : ""}. Podrás revisar tu cédula antes de
             emitir el voto. Tienes 20 minutos.
           </p>
         </div>
@@ -114,7 +118,7 @@ export function Cedula({
         {cargos.map((cargo, i) => {
           const marcados = elegidos(cargo.id);
           const multiple = cargo.maxSelecciones > 1;
-          const lleno = multiple && marcados.length >= cargo.maxSelecciones;
+          const lleno = multiple && marcados.length >= requeridas(cargo);
           return (
             <section
               key={cargo.id}
@@ -134,13 +138,14 @@ export function Cedula({
                   </h2>
                   {multiple && (
                     <p className="mt-1 text-sm text-slate-600">
-                      Marca hasta <strong>{cargo.maxSelecciones}</strong>. Quedan elegidos los {cargo.maxSelecciones} más votados.
+                      Toca a tus <strong>{requeridas(cargo)}</strong> preferidos en orden: primero tu 1.º, luego tu 2.º y así. Para cambiar,
+                      tócalo de nuevo y elige otro.
                     </p>
                   )}
                 </div>
                 {multiple ? (
                   <span className={`shrink-0 text-sm font-semibold ${marcados.length ? "text-emerald-700" : "text-slate-400"}`}>
-                    {marcados.length} de {cargo.maxSelecciones}
+                    {marcados.length} de {requeridas(cargo)}
                   </span>
                 ) : marcados.length ? (
                   <span className="flex shrink-0 items-center gap-1 text-sm font-semibold text-emerald-700">
@@ -164,6 +169,7 @@ export function Cedula({
                       nombreGrupo={cargo.id}
                       multiple={multiple}
                       seleccionado={seleccionado}
+                      orden={multiple && seleccionado ? marcados.indexOf(c.id) + 1 : undefined}
                       atenuado={!seleccionado && marcados.length > 0 && (!multiple || lleno)}
                       bloqueado={!seleccionado && lleno}
                       onSeleccionar={() => elegir(cargo, c.id)}
@@ -185,14 +191,14 @@ export function Cedula({
             </p>
             <div className="mt-2 flex gap-1">
               {cargos.map((c) => (
-                <span key={c.id} className={`h-1.5 flex-1 rounded-full transition-colors ${elegidos(c.id).length ? "bg-acento-400" : "bg-slate-200"}`} />
+                <span key={c.id} className={`h-1.5 flex-1 rounded-full transition-colors ${completo(c) ? "bg-acento-400" : "bg-slate-200"}`} />
               ))}
             </div>
           </div>
           <button
             type="button"
             onClick={() => {
-              const pendiente = cargos.find((c) => !elegidos(c.id).length);
+              const pendiente = cargos.find((c) => !completo(c));
               if (pendiente) irA(pendiente.id);
               else setFase({ tipo: "confirmando" });
             }}
@@ -222,15 +228,18 @@ function TarjetaCandidato({
   nombreGrupo,
   multiple,
   seleccionado,
+  orden,
   atenuado,
   bloqueado,
   onSeleccionar,
 }: {
   candidato: Candidato;
   nombreGrupo: string;
-  /** Cargo con varios elegidos: la tarjeta funciona como casilla de verificación. */
+  /** Cargo por rondas: la tarjeta funciona como casilla y muestra el orden de preferencia. */
   multiple: boolean;
   seleccionado: boolean;
+  /** Lugar en el orden de preferencia (1, 2, 3…) en los cargos por rondas. */
+  orden?: number;
   atenuado: boolean;
   /** Ya se marcó el máximo permitido en el cargo. */
   bloqueado: boolean;
@@ -251,7 +260,7 @@ function TarjetaCandidato({
         type={multiple ? "checkbox" : "radio"}
         name={nombreGrupo}
         value={candidato.id}
-        aria-label={candidato.nombreCompleto}
+        aria-label={orden ? `${candidato.nombreCompleto}, preferencia ${orden}` : candidato.nombreCompleto}
         checked={seleccionado}
         disabled={bloqueado}
         onChange={onSeleccionar}
@@ -284,9 +293,13 @@ function TarjetaCandidato({
           aria-hidden
         >
           {seleccionado ? (
-            <>
-              <Check className="size-4" strokeWidth={3} /> Elegido
-            </>
+            orden ? (
+              `Tu ${orden}.ª preferencia`
+            ) : (
+              <>
+                <Check className="size-4" strokeWidth={3} /> Elegido
+              </>
+            )
           ) : (
             "Elegir"
           )}
@@ -298,7 +311,7 @@ function TarjetaCandidato({
           seleccionado ? "scale-100 border-acento-400 bg-acento-400 text-marca-950" : "border-slate-300 bg-white sm:scale-0"
         }`}
       >
-        {seleccionado && <Check className="size-4" strokeWidth={3} />}
+        {seleccionado && (orden ? <span className="text-sm font-bold">{orden}</span> : <Check className="size-4" strokeWidth={3} />)}
       </span>
     </label>
   );
@@ -356,16 +369,21 @@ function Confirmacion({
     >
       <ul className="space-y-2.5">
         {cargos.map((cargo) => {
-          const marcados = cargo.candidatos.filter((x) => selecciones[cargo.id]?.includes(x.id));
+          // En el orden en que el votante los eligió (importa en los cargos por rondas).
+          const marcados = (selecciones[cargo.id] ?? []).flatMap((id) => cargo.candidatos.filter((x) => x.id === id));
+          const porRondas = cargo.maxSelecciones > 1;
           return (
             <li key={cargo.id} className="rounded-2xl bg-slate-50 p-3 ring-1 ring-inset ring-slate-200/70">
               <p className="text-xs font-semibold uppercase tracking-wider text-acento-700">
                 {cargo.nombre}
-                {cargo.maxSelecciones > 1 && ` · ${marcados.length} de ${cargo.maxSelecciones}`}
+                {porRondas && " · en orden de preferencia"}
               </p>
               <ul className="mt-2 space-y-2">
-                {marcados.map((c) => (
+                {marcados.map((c, i) => (
                   <li key={c.id} className="flex items-center gap-3">
+                    {porRondas && (
+                      <span className="grid size-7 shrink-0 place-items-center rounded-full bg-acento-400 text-sm font-bold text-marca-950">{i + 1}</span>
+                    )}
                     <Foto url={c.fotoUrl} nombre={c.nombreCompleto} className="size-12 text-base" />
                     <p className="min-w-0 font-bold text-marca-950">{c.nombreCompleto}</p>
                   </li>

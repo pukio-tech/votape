@@ -126,12 +126,94 @@ export function TableroResultados({ inicial, intervaloMs = 10_000 }: { inicial: 
         </div>
       </div>
 
-      {cargo && <GraficoCargo key={cargo.id} cargo={cargo} />}
+      {cargo && (cargo.rondas ? <CargoPorRondas key={cargo.id} cargo={cargo} /> : <GraficoCargo key={cargo.id} cargo={cargo} />)}
     </div>
   );
 }
 
 type Cargo = Resultados["cargos"][number];
+
+const ORDINALES = ["Primer", "Segundo", "Tercer", "Cuarto", "Quinto", "Sexto", "Séptimo", "Octavo", "Noveno", "Décimo"];
+
+/** "Asesores" → "Asesor": nombre del puesto a partir del cargo. */
+function puesto(cargo: string, n: number) {
+  const singular = cargo.endsWith("es") ? cargo.slice(0, -2) : cargo.endsWith("s") ? cargo.slice(0, -1) : cargo;
+  return `${ORDINALES[n - 1] ?? `${n}.º`} ${singular}`;
+}
+
+/**
+ * Cargo por rondas (ej. Asesores): cada puesto se decide con todos los votos, quitando a los ya
+ * elegidos. Muestra el ganador de cada puesto y el gráfico de cada ronda.
+ */
+function CargoPorRondas({ cargo }: { cargo: Cargo }) {
+  const rondas = cargo.rondas ?? [];
+  const [activa, setActiva] = useState(0);
+  const nombrePor = new Map(cargo.candidatos.map((c) => [c.id, c]));
+  const ronda = rondas[activa];
+
+  return (
+    <div className="space-y-5">
+      <section className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-200/80 sm:p-6" aria-label={`Elegidos en ${cargo.nombre}`}>
+        <h3 className="text-lg font-bold text-marca-950">{cargo.nombre}</h3>
+        <p className="mt-1 text-sm text-slate-600">
+          Se elige por rondas: en cada puesto cuentan los votos de todos; quien eligió a alguien ya electo pasa a su siguiente preferencia.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          {Array.from({ length: cargo.maxSelecciones }, (_, i) => {
+            const r = rondas[i];
+            const ganador = r?.ganadorId ? r.candidatos.find((c) => c.id === r.ganadorId) : null;
+            return (
+              <div key={i} className={`rounded-xl p-4 ring-1 ring-inset ${ganador ? "bg-marca-50 ring-marca-200" : "bg-slate-50 ring-slate-200"}`}>
+                <p className="text-xs font-semibold uppercase tracking-wider text-acento-700">{puesto(cargo.nombre, i + 1)}</p>
+                {ganador ? (
+                  <div className="mt-2 flex items-center gap-3">
+                    <Foto url={ganador.fotoUrl} nombre={ganador.nombreCompleto} destacado />
+                    <div className="min-w-0">
+                      <p className="font-bold leading-snug text-marca-950">{ganador.nombreCompleto}</p>
+                      <p className="text-sm tabular-nums text-slate-600">
+                        {num(ganador.votos)} de {num(r.total)} votos · {pct(ganador.porcentaje)}
+                      </p>
+                    </div>
+                  </div>
+                ) : r?.empatados.length ? (
+                  <p className="mt-2 text-sm font-medium text-amber-800">
+                    Empate entre {r.empatados.map((id) => nombrePor.get(id)?.nombreCompleto ?? "—").join(" y ")}. Lo define el comité.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-sm text-slate-500">{rondas.length && i >= rondas.length ? "Pendiente del empate anterior." : "Sin votos."}</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {rondas.length > 0 && (
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0" role="tablist" aria-label="Rondas">
+          {rondas.map((r, i) => (
+            <button
+              key={r.puesto}
+              role="tab"
+              aria-selected={i === activa}
+              onClick={() => setActiva(i)}
+              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${
+                i === activa ? "bg-marca-800 text-white shadow-sm" : "bg-white text-marca-700 ring-1 ring-inset ring-slate-300 hover:ring-marca-300"
+              }`}
+            >
+              Ronda {r.puesto}: {puesto(cargo.nombre, r.puesto)}
+            </button>
+          ))}
+        </div>
+      )}
+      {ronda && (
+        <GraficoCargo
+          key={`${cargo.id}-${ronda.puesto}`}
+          cargo={{ ...cargo, nombre: `${puesto(cargo.nombre, ronda.puesto)} · ronda ${ronda.puesto}`, maxSelecciones: 1, total: ronda.total, candidatos: ronda.candidatos, rondas: null }}
+        />
+      )}
+    </div>
+  );
+}
 
 function GraficoCargo({ cargo }: { cargo: Cargo }) {
   const desplazable = useRef<HTMLDivElement>(null);

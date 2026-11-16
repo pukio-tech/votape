@@ -40,7 +40,8 @@ model Cargo {
   proceso        ProcesoElectoral @relation(fields: [procesoId], references: [id], onDelete: Cascade)
   nombre         String // ej. Presidencia, Secretaría
   orden          Int              @default(0)
-  // Cuántos candidatos marca cada votante; quedan elegidos los N más votados (ej. Asesores = 3).
+  // Puestos que se eligen. Con más de 1 (ej. Asesores = 3) se vota por orden de preferencia y se
+  // elige por rondas: 1.er puesto con todos los votos, 2.º sin el ganador, y así sucesivamente.
   maxSelecciones Int              @default(1)
   candidatos     Candidato[]
   votos          Voto[]
@@ -103,6 +104,10 @@ model Voto {
   candidatoId  String
   candidato    Candidato        @relation(fields: [candidatoId], references: [id], onDelete: Cascade)
   fechaEmision DateTime         @default(now())
+  // Cargos por rondas (maxSelecciones > 1): orden de preferencia (1, 2, 3…) y papeleta que agrupa
+  // las preferencias de un mismo voto. La papeleta es aleatoria: no identifica al votante.
+  preferencia  Int?
+  papeleta     String?
 }
 
 model AuditoriaLog {
