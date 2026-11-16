@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "./prisma";
 import { estadoVotacion, obtenerProceso } from "./proceso";
-import { contarPorRondas } from "./rondas";
+import { contarPorRondas, decidirGanador } from "./rondas";
 
 export type Resultados = NonNullable<Awaited<ReturnType<typeof calcularResultados>>>;
 
@@ -34,7 +34,7 @@ export async function calcularResultados() {
   const estado = estadoVotacion(proceso);
   const publicados = !estado.abierta && estado.motivo === "CERRADA";
 
-  const [cargos, conteo, preferencias, totalPadron, totalVotaron] = await Promise.all([
+  const [cargos, conteo, preferencias, desempates, totalPadron, totalVotaron] = await Promise.all([
     publicados
       ? prisma.cargo.findMany({
           where: { procesoId: proceso.id },
@@ -49,11 +49,15 @@ export async function calcularResultados() {
           select: { id: true, cargoId: true, candidatoId: true, preferencia: true, papeleta: true },
         })
       : Promise.resolve([]),
+    publicados ? prisma.desempate.findMany({ where: { cargo: { procesoId: proceso.id } } }) : Promise.resolve([]),
     prisma.votante.count(),
     prisma.registroParticipacion.count(),
   ]);
 
   const votosPor = new Map(conteo.map((c) => [c.candidatoId, c._count._all]));
+  // Decisiones del comité por cargo: puesto → candidato.
+  const decisiones = new Map<string, Record<number, string>>();
+  for (const d of desempates) decisiones.set(d.cargoId, { ...decisiones.get(d.cargoId), [d.puesto]: d.candidatoId });
 
   // Arma las papeletas (preferencias en orden) de cada cargo por rondas.
   const papeletasPorCargo = new Map<string, Map<string, { candidatoId: string; preferencia: number }[]>>();
@@ -81,7 +85,15 @@ export async function calcularResultados() {
     },
     cargos: cargos.map((cargo) => {
       if (cargo.maxSelecciones <= 1) {
-        return { id: cargo.id, nombre: cargo.nombre, maxSelecciones: cargo.maxSelecciones, ...tabla(cargo.candidatos, (id) => votosPor.get(id) ?? 0), rondas: null };
+        const votos = Object.fromEntries(cargo.candidatos.map((c) => [c.id, votosPor.get(c.id) ?? 0]));
+        return {
+          id: cargo.id,
+          nombre: cargo.nombre,
+          maxSelecciones: cargo.maxSelecciones,
+          ...tabla(cargo.candidatos, (id) => votos[id]),
+          ...decidirGanador(votos, { decision: decisiones.get(cargo.id)?.[1] }),
+          rondas: null,
+        };
       }
       const papeletas = [...(papeletasPorCargo.get(cargo.id)?.values() ?? [])].map((p) =>
         p.sort((a, b) => a.preferencia - b.preferencia).map((x) => x.candidatoId),
@@ -90,10 +102,12 @@ export async function calcularResultados() {
         papeletas,
         cargo.candidatos.map((c) => c.id),
         cargo.maxSelecciones,
+        decisiones.get(cargo.id),
       ).map((r) => ({
         puesto: r.puesto,
         ganadorId: r.ganadorId,
         empatados: r.empatados,
+        criterio: r.criterio,
         ...tabla(
           cargo.candidatos.filter((c) => c.id in r.votos),
           (id) => r.votos[id] ?? 0,
@@ -105,6 +119,9 @@ export async function calcularResultados() {
         nombre: cargo.nombre,
         maxSelecciones: cargo.maxSelecciones,
         ...(rondas[0] ? { total: rondas[0].total, candidatos: rondas[0].candidatos } : tabla(cargo.candidatos, () => 0)),
+        ganadorId: rondas[0]?.ganadorId ?? null,
+        empatados: rondas[0]?.empatados ?? [],
+        criterio: rondas[0]?.criterio ?? null,
         rondas,
       };
     }),

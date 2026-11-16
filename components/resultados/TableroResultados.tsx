@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Crown, Landmark, Lock, WifiOff } from "lucid
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatearActualizado, formatearFecha } from "@/lib/fechas";
 import type { Resultados } from "@/lib/resultados";
+import { resolverEmpate } from "@/app/admin/acciones-eleccion";
 
 const ALTO_GRAFICO = 300; // px del área de barras
 const ANCHO_COLUMNA = 128; // px por candidato al desplazar con las flechas
@@ -21,7 +22,16 @@ function escala(max: number) {
   return { tope: Math.ceil(max / paso) * paso, paso };
 }
 
-export function TableroResultados({ inicial, intervaloMs = 10_000 }: { inicial: Resultados; intervaloMs?: number }) {
+export function TableroResultados({
+  inicial,
+  intervaloMs = 10_000,
+  puedeDesempatar = false,
+}: {
+  inicial: Resultados;
+  intervaloMs?: number;
+  /** Solo administradores del panel: muestra los botones para resolver empates pendientes. */
+  puedeDesempatar?: boolean;
+}) {
   const [datos, setDatos] = useState(inicial);
   const [conectado, setConectado] = useState(true);
   const [cargoId, setCargoId] = useState(inicial.cargos[0]?.id ?? "");
@@ -43,6 +53,16 @@ export function TableroResultados({ inicial, intervaloMs = 10_000 }: { inicial: 
   }, [actualizar, intervaloMs]);
 
   const cargo = datos.cargos.find((c) => c.id === cargoId) ?? datos.cargos[0];
+  const [avisoEmpate, setAvisoEmpate] = useState<{ ok: boolean; mensaje: string } | null>(null);
+
+  async function resolver(c: Cargo, puestoNumero: number, candidatoId: string) {
+    const nombre = c.candidatos.find((x) => x.id === candidatoId)?.nombreCompleto ?? "este candidato";
+    const etiqueta = c.rondas ? puesto(c.nombre, puestoNumero) : c.nombre;
+    if (!window.confirm(`¿Confirmas que el comité da ${etiqueta} a ${nombre}? Quedará registrado en la auditoría.`)) return;
+    const r = await resolverEmpate(c.id, puestoNumero, candidatoId);
+    setAvisoEmpate(r);
+    await actualizar();
+  }
   const { participacion: p } = datos;
 
   return (
@@ -126,7 +146,17 @@ export function TableroResultados({ inicial, intervaloMs = 10_000 }: { inicial: 
         </div>
       </div>
 
-      {cargo && (cargo.rondas ? <CargoPorRondas key={cargo.id} cargo={cargo} /> : <GraficoCargo key={cargo.id} cargo={cargo} />)}
+      {avisoEmpate && (
+        <p role="status" className={`rounded-lg px-3 py-2 text-sm ring-1 ring-inset ${avisoEmpate.ok ? "bg-marca-50 text-marca-800 ring-marca-200" : "bg-red-50 text-red-700 ring-red-200"}`}>
+          {avisoEmpate.mensaje}
+        </p>
+      )}
+      {cargo &&
+        (cargo.rondas ? (
+          <CargoPorRondas key={cargo.id} cargo={cargo} onResolver={puedeDesempatar ? (p, id) => resolver(cargo, p, id) : undefined} />
+        ) : (
+          <GraficoCargo key={cargo.id} cargo={cargo} onResolver={puedeDesempatar ? (id) => resolver(cargo, 1, id) : undefined} />
+        ))}
     </div>
   );
 }
@@ -145,10 +175,57 @@ function puesto(cargo: string, n: number) {
  * Cargo por rondas (ej. Asesores): cada puesto se decide con todos los votos, quitando a los ya
  * elegidos. Muestra el ganador de cada puesto y el gráfico de cada ronda.
  */
-function CargoPorRondas({ cargo }: { cargo: Cargo }) {
+type Resolver = (puesto: number, candidatoId: string) => void;
+type Desempate = { ganadorId: string | null; empatados: string[]; criterio: "votos" | "preferencias" | "comite" | null };
+
+/** Explica cómo se resolvió un empate o, si sigue pendiente, permite al comité decidirlo. */
+function AvisoEmpate({
+  desempate,
+  nombres,
+  onResolver,
+}: {
+  desempate: Desempate;
+  nombres: Map<string, string>;
+  onResolver?: (candidatoId: string) => void;
+}) {
+  const { ganadorId, empatados, criterio } = desempate;
+  if (empatados.length < 2) return null;
+  const lista = empatados.map((id) => nombres.get(id) ?? "—").join(" y ");
+  if (ganadorId && (criterio === "preferencias" || criterio === "comite")) {
+    return (
+      <p className="mt-3 rounded-lg bg-marca-50 px-3 py-2 text-sm text-marca-800 ring-1 ring-inset ring-marca-200">
+        Empate entre {lista}: {criterio === "preferencias" ? "se resolvió por las siguientes preferencias" : "lo resolvió el comité"} a favor de{" "}
+        <strong>{nombres.get(ganadorId)}</strong>.
+      </p>
+    );
+  }
+  return (
+    <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 ring-1 ring-inset ring-amber-200">
+      <p className="font-medium">
+        Empate entre {lista}. {onResolver ? "Elige quién ocupa el puesto según el reglamento del comité:" : "Lo define el comité."}
+      </p>
+      {onResolver && (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {empatados.map((id) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onResolver(id)}
+              className="rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-amber-900 ring-1 ring-inset ring-amber-300 hover:bg-amber-100"
+            >
+              Dar el puesto a {nombres.get(id)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CargoPorRondas({ cargo, onResolver }: { cargo: Cargo; onResolver?: Resolver }) {
   const rondas = cargo.rondas ?? [];
   const [activa, setActiva] = useState(0);
-  const nombrePor = new Map(cargo.candidatos.map((c) => [c.id, c]));
+  const nombres = new Map(cargo.candidatos.map((c) => [c.id, c.nombreCompleto]));
   const ronda = rondas[activa];
 
   return (
@@ -173,12 +250,12 @@ function CargoPorRondas({ cargo }: { cargo: Cargo }) {
                       <p className="text-sm tabular-nums text-slate-600">
                         {num(ganador.votos)} de {num(r.total)} votos · {pct(ganador.porcentaje)}
                       </p>
+                      {r.criterio === "preferencias" && <p className="text-xs text-marca-700">Por desempate: siguientes preferencias</p>}
+                      {r.criterio === "comite" && <p className="text-xs text-marca-700">Por desempate: decisión del comité</p>}
                     </div>
                   </div>
                 ) : r?.empatados.length ? (
-                  <p className="mt-2 text-sm font-medium text-amber-800">
-                    Empate entre {r.empatados.map((id) => nombrePor.get(id)?.nombreCompleto ?? "—").join(" y ")}. Lo define el comité.
-                  </p>
+                  <AvisoEmpate desempate={r} nombres={nombres} onResolver={onResolver && ((id) => onResolver(r.puesto, id))} />
                 ) : (
                   <p className="mt-2 text-sm text-slate-500">{rondas.length && i >= rondas.length ? "Pendiente del empate anterior." : "Sin votos."}</p>
                 )}
@@ -208,23 +285,30 @@ function CargoPorRondas({ cargo }: { cargo: Cargo }) {
       {ronda && (
         <GraficoCargo
           key={`${cargo.id}-${ronda.puesto}`}
-          cargo={{ ...cargo, nombre: `${puesto(cargo.nombre, ronda.puesto)} · ronda ${ronda.puesto}`, maxSelecciones: 1, total: ronda.total, candidatos: ronda.candidatos, rondas: null }}
+          cargo={{
+            ...cargo,
+            nombre: `${puesto(cargo.nombre, ronda.puesto)} · ronda ${ronda.puesto}`,
+            total: ronda.total,
+            candidatos: ronda.candidatos,
+            ganadorId: ronda.ganadorId,
+            empatados: ronda.empatados,
+            criterio: ronda.criterio,
+            rondas: null,
+          }}
+          onResolver={onResolver && ((id) => onResolver(ronda.puesto, id))}
         />
       )}
     </div>
   );
 }
 
-function GraficoCargo({ cargo }: { cargo: Cargo }) {
+function GraficoCargo({ cargo, onResolver }: { cargo: Cargo; onResolver?: (candidatoId: string) => void }) {
   const desplazable = useRef<HTMLDivElement>(null);
   const { tope, paso } = escala(Math.max(...cargo.candidatos.map((c) => c.votos), 0));
   const marcas = Array.from({ length: tope / paso + 1 }, (_, i) => i * paso);
-  // Quedan elegidos los N más votados (N = maxSelecciones; 1 en la mayoría de cargos). Si hay empate justo
-  // en el último puesto, nadie del empate se marca como elegido y se muestra el aviso.
-  const n = cargo.maxSelecciones;
-  const umbral = cargo.candidatos[n]?.votos ?? -1;
-  const elegido = (i: number) => i < n && cargo.candidatos[i].votos > 0 && cargo.candidatos[i].votos > umbral;
-  const empateEnCorte = (cargo.candidatos[n - 1]?.votos ?? 0) > 0 && cargo.candidatos[n - 1]?.votos === cargo.candidatos[n]?.votos;
+  // El ganador lo calcula el servidor (incluye desempates por preferencias o del comité).
+  const elegido = (i: number) => cargo.candidatos[i].id === cargo.ganadorId;
+  const nombres = new Map(cargo.candidatos.map((c) => [c.id, c.nombreCompleto]));
 
   const mover = (dir: 1 | -1) => desplazable.current?.scrollBy({ left: dir * ANCHO_COLUMNA * 2, behavior: "smooth" });
 
@@ -233,26 +317,12 @@ function GraficoCargo({ cargo }: { cargo: Cargo }) {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 id="titulo-grafico" className="text-lg font-bold text-marca-950">
           {cargo.nombre}
-          {n > 1 && (
-            <span className="ml-2 inline-flex rounded-full bg-acento-100 px-2.5 py-0.5 align-middle text-xs font-semibold text-acento-800">
-              Se eligen {n}
-            </span>
-          )}
         </h3>
         <p className="text-sm text-slate-500">
           {num(cargo.total)} {cargo.total === 1 ? "voto válido" : "votos válidos"}
         </p>
       </div>
-      {n > 1 && (
-        <p className="mt-1 text-xs text-slate-500">
-          Cada votante marca hasta {n}; los porcentajes se calculan sobre el total de marcas del cargo.
-        </p>
-      )}
-      {empateEnCorte && (
-        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 ring-1 ring-inset ring-amber-200">
-          {n === 1 ? "Empate en el primer lugar." : `Empate en el puesto ${n}: el último lugar elegido aún no está definido.`}
-        </p>
-      )}
+      <AvisoEmpate desempate={cargo} nombres={nombres} onResolver={onResolver} />
 
       <div className="relative mt-2 flex">
         {/* Eje Y */}
@@ -289,7 +359,7 @@ function GraficoCargo({ cargo }: { cargo: Cargo }) {
                         <div className="mb-2 flex flex-col items-center">
                           <Foto url={c.fotoUrl} nombre={c.nombreCompleto} destacado={destacado} />
                           <span className={`mt-1.5 flex items-center gap-1 whitespace-nowrap text-[13px] font-bold tabular-nums sm:text-lg text-marca-700`}>
-                            {destacado && <Crown className="size-3.5 sm:size-4" aria-label={n > 1 ? "Elegido" : "Lidera"} />}
+                            {destacado && <Crown className="size-3.5 sm:size-4" aria-label="Ganador" />}
                             {pct(c.porcentaje)}
                           </span>
                         </div>
@@ -355,9 +425,9 @@ function GraficoCargo({ cargo }: { cargo: Cargo }) {
                 <td className="hidden py-2.5 pr-3 tabular-nums text-slate-400 sm:table-cell">{i + 1}</td>
                 <td className="py-2.5 pr-3 font-medium text-marca-950">
                   {c.nombreCompleto}
-                  {n > 1 && elegido(i) && (
+                  {elegido(i) && (
                     <span className="ml-2 inline-flex rounded-full bg-marca-50 px-2 py-0.5 align-middle text-[11px] font-semibold text-marca-700 ring-1 ring-inset ring-marca-200">
-                      Elegido
+                      Ganador
                     </span>
                   )}
                 </td>

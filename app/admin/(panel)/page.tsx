@@ -3,9 +3,10 @@ import Link from "next/link";
 import { TableroResultados } from "@/components/resultados/TableroResultados";
 import { boton, tarjeta } from "@/components/ui";
 import { calcularResultados } from "@/lib/resultados";
+import { obtenerAdmin } from "@/lib/sesion";
 
 export default async function Tablero() {
-  const resultados = await calcularResultados();
+  const [resultados, admin] = await Promise.all([calcularResultados(), obtenerAdmin()]);
 
   if (!resultados) {
     return (
@@ -39,7 +40,7 @@ export default async function Tablero() {
           Ver página pública <ExternalLink className="size-4" aria-hidden />
         </Link>
       </div>
-      <TableroResultados inicial={resultados} intervaloMs={5000} />
+      <TableroResultados inicial={resultados} intervaloMs={5000} puedeDesempatar={admin?.rol === "ADMIN"} />
     </main>
   );
 }

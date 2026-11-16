@@ -8,6 +8,7 @@ import { exigirAdmin } from "@/lib/autorizacion";
 import { desdeInputLocal } from "@/lib/fechas";
 import { obtenerIp } from "@/lib/peticion";
 import { prisma } from "@/lib/prisma";
+import { calcularResultados } from "@/lib/resultados";
 import { obtenerProceso, registrarLog } from "@/lib/proceso";
 
 const RUTAS = ["/admin/candidatos", "/admin/jornada", "/admin", "/"];
@@ -234,4 +235,41 @@ export async function guardarLogo(_prev: Respuesta, formData: FormData): Promise
   await registrarLog("AJUSTES_EDITADOS", `${admin.nombre} ${logoUrl ? "cambió" : "quitó"} el logo de la plataforma.`, await obtenerIp());
   revalidatePath("/", "layout");
   return { ok: true, mensaje: logoUrl ? "Logo actualizado." : "Se quitó el logo; se usa el ícono por defecto." };
+}
+
+// ---------- Desempates ----------
+
+/**
+ * El comité decide un empate que no se resolvió solo (ni por votos ni por preferencias).
+ * Solo con la votación cerrada y solo entre los candidatos realmente empatados en ese puesto.
+ */
+export async function resolverEmpate(cargoId: string, puesto: number, candidatoId: string): Promise<Respuesta> {
+  const admin = await exigirAdmin();
+  const resultados = await calcularResultados();
+  if (!resultados?.publicados) return { ok: false, mensaje: "Los empates se resuelven cuando la votación ya cerró." };
+
+  const cargo = resultados.cargos.find((c) => c.id === cargoId);
+  if (!cargo) return { ok: false, mensaje: "El cargo no existe." };
+  const ronda = cargo.rondas ? cargo.rondas.find((r) => r.puesto === puesto) : puesto === 1 ? cargo : undefined;
+  if (!ronda || !ronda.empatados.includes(candidatoId) || ronda.criterio === "votos" || ronda.criterio === "preferencias") {
+    return { ok: false, mensaje: "Ese puesto no tiene un empate pendiente con ese candidato." };
+  }
+
+  const candidato = cargo.candidatos.find((c) => c.id === candidatoId);
+  await prisma.$transaction([
+    prisma.desempate.upsert({
+      where: { cargoId_puesto: { cargoId, puesto } },
+      create: { cargoId, puesto, candidatoId, decididoPor: admin.nombre },
+      update: { candidatoId, decididoPor: admin.nombre },
+    }),
+    // Cambiar un puesto cambia las rondas siguientes: sus decisiones previas ya no aplican.
+    prisma.desempate.deleteMany({ where: { cargoId, puesto: { gt: puesto } } }),
+  ]);
+  await registrarLog(
+    "EMPATE_RESUELTO",
+    `${admin.nombre} resolvió el empate de ${cargo.nombre} (puesto ${puesto}) a favor de ${candidato?.nombreCompleto ?? "un candidato"}.`,
+    await obtenerIp(),
+  );
+  refrescar();
+  return { ok: true, mensaje: `Empate resuelto: ${candidato?.nombreCompleto ?? "candidato"}.` };
 }

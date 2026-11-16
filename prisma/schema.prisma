@@ -45,6 +45,21 @@ model Cargo {
   maxSelecciones Int              @default(1)
   candidatos     Candidato[]
   votos          Voto[]
+  desempates     Desempate[]
+}
+
+// Empate que no se resolvió solo y que decidió el comité: en el cargo y puesto (1, 2, 3…), gana
+// `candidatoId`. Se usa al calcular los resultados.
+model Desempate {
+  id          String   @id @default(cuid())
+  cargoId     String
+  cargo       Cargo    @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+  puesto      Int
+  candidatoId String
+  decididoPor String
+  createdAt   DateTime @default(now())
+
+  @@unique([cargoId, puesto])
 }
 
 model Candidato {
