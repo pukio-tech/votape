@@ -240,15 +240,16 @@ function CargoPorRondas({ cargo, onResolver }: { cargo: Cargo; onResolver?: Reso
             const r = rondas[i];
             const ganador = r?.ganadorId ? r.candidatos.find((c) => c.id === r.ganadorId) : null;
             return (
-              <div key={i} className={`rounded-xl p-4 ring-1 ring-inset ${ganador ? "bg-marca-50 ring-marca-200" : "bg-slate-50 ring-slate-200"}`}>
+              <div key={i} className={`flex flex-col rounded-xl p-4 ring-1 ring-inset ${ganador ? "bg-marca-50 ring-marca-200" : "bg-slate-50 ring-slate-200"}`}>
                 <p className="text-xs font-semibold uppercase tracking-wider text-acento-700">{puesto(cargo.nombre, i + 1)}</p>
                 {ganador ? (
                   <div className="mt-2 flex items-center gap-3">
                     <Foto url={ganador.fotoUrl} nombre={ganador.nombreCompleto} destacado />
                     <div className="min-w-0">
                       <p className="font-bold leading-snug text-marca-950">{ganador.nombreCompleto}</p>
-                      <p className="text-sm tabular-nums text-slate-600">
-                        {num(ganador.votos)} de {num(r.total)} votos · {pct(ganador.porcentaje)}
+                      <p className="text-2xl font-bold tabular-nums tracking-tight text-marca-700">{pct(ganador.porcentaje)}</p>
+                      <p className="text-xs tabular-nums text-slate-500">
+                        {num(ganador.votos)} de {num(r.total)} votos
                       </p>
                       {r.criterio === "preferencias" && <p className="text-xs text-marca-700">Por desempate: siguientes preferencias</p>}
                       {r.criterio === "comite" && <p className="text-xs text-marca-700">Por desempate: decisión del comité</p>}
@@ -257,7 +258,32 @@ function CargoPorRondas({ cargo, onResolver }: { cargo: Cargo; onResolver?: Reso
                 ) : r?.empatados.length ? (
                   <AvisoEmpate desempate={r} nombres={nombres} onResolver={onResolver && ((id) => onResolver(r.puesto, id))} />
                 ) : (
-                  <p className="mt-2 text-sm text-slate-500">{rondas.length && i >= rondas.length ? "Pendiente del empate anterior." : "Sin votos."}</p>
+                  <p className="mt-2 text-sm text-slate-500">
+                    {!r ? "Se define cuando se resuelva el puesto anterior." : r.total === 0 ? "Aún sin votos." : ""}
+                  </p>
+                )}
+
+                {/* Porcentajes de todos los candidatos en la ronda de este puesto */}
+                {r && (
+                  <ul className="mt-4 space-y-2 border-t border-slate-200/80 pt-3" aria-label={`Porcentajes para ${puesto(cargo.nombre, i + 1)}`}>
+                    {r.candidatos.map((c) => {
+                      const gana = c.id === r.ganadorId;
+                      return (
+                        <li key={c.id}>
+                          <div className="flex items-baseline justify-between gap-2 text-xs">
+                            <span className={`truncate ${gana ? "font-bold text-marca-950" : "text-slate-600"}`}>{c.nombreCompleto}</span>
+                            <span className={`shrink-0 tabular-nums ${gana ? "font-bold text-marca-800" : "text-slate-500"}`}>{pct(c.porcentaje)}</span>
+                          </div>
+                          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-200/80">
+                            <div
+                              className={`h-full rounded-full transition-[width] duration-700 ease-out ${gana ? "bg-marca-500" : "bg-acento-400"}`}
+                              style={{ width: `${c.porcentaje}%` }}
+                            />
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 )}
               </div>
             );
